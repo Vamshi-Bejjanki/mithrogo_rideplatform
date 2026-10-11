@@ -12,7 +12,7 @@ Principle: **start as a modular monolith, split out only the parts that get hot*
 - Customer requests a ride (pickup → drop), sees fare, gets matched with a nearby captain
 - Captain goes online, receives offers, accepts, navigates, starts, completes
 - Live captain location visible to customer during the ride
-- Pay for the ride; captain pays flat daily subscription (no commission)
+- Pay for the ride; captain chooses a plan: flat daily fee (₹30) or ride-share (1 ride's fare per day, from the first 5)
 - Admin approves KYC, manages users, pricing, complaints
 
 ### Non-functional
@@ -107,9 +107,9 @@ Ride REQUESTED
    │  FareService estimate stored
    ▼
 SEARCHING
-   │  candidates = GEOSEARCH(pickup, radius)         ← Redis
+   │  candidates = GEOSEARCH(pickup, radius, vehicle_type)  ← Redis
    │  filter in one query: approved, active, ONLINE (not BUSY),
-   │                       subscription ACTIVE, vehicle verified
+   │                       plan active (see 3.6), vehicle verified
    │  sort by distance (later: ETA, rating, acceptance rate)
    ▼
 offer to captain #1  ──► push (FCM) + WS event, offer TTL (e.g. 15 s)
@@ -142,11 +142,33 @@ REQUESTED → SEARCHING → ACCEPTED → CAPTAIN_ARRIVED → STARTED → COMPLET
 - `estimated_fare` computed at request time and stored; `final_fare` computed server-side at completion from actual distance/time
 - Client never sends a fare. Config is versioned so old rides keep the rates they were priced with.
 
-### 3.6 Subscription service
-- `SubscriptionPlan` (amount/duration from DB) and `CaptainSubscription`
-- `is_eligible(captain)` is the single check used by go-online, matching and accept
-- Celery beat expires subscriptions and sends "expiring soon" notifications
+### 3.6 Plan service (daily subscription and ride-share)
+- `SubscriptionPlan` (type, amount, duration, block size from DB) and `CaptainSubscription`
+- `is_eligible(captain)` is the single check used by go-online, matching and accept:
+  - DAILY_FLAT → subscription ACTIVE and not expired
+  - RIDE_SHARE → plan enabled, unpaid dues below the limit, and no unpaid shortfall fee
+- Celery beat expires daily subscriptions and sends "expiring soon" notifications
 - Expiry never touches a ride already STARTED; it only blocks going online / new offers
+
+**Ride-share (1 ride a day) counting** runs inside the ride-completion transaction:
+```text
+complete ride
+  → get/create today's RideShareDay for the captain, lock it (SELECT ... FOR UPDATE)
+  → completed_rides += 1
+  → if platform_ride_id already set      → nothing taken (ride is free)
+  → elif subscription.penalty_pending    → platform ride, reason PENALTY_FIRST_RIDE, clear penalty_pending
+  → elif this ride was surrendered       → platform ride, reason SURRENDERED
+  → elif completed_rides == qualifying_rides → platform ride, reason AUTO_5TH
+  → if platform ride → set platform_ride_id, create PlatformDue(final_fare)
+```
+- Surrender is an explicit captain action (`POST /captains/rides/{id}/surrender/`), allowed only on rides 1–4 of the day, once per day, before the ride completes
+- Only COMPLETED rides count; cancelled rides never advance the count
+- At most one platform ride per day: after it is set, later rides that day are never charged
+- A new `service_date` (configurable timezone) starts a new `RideShareDay`
+- An end-of-day Celery job closes each open `RideShareDay`. If it had 1 to (qualifying_rides − 1) completed rides and no platform ride, it marks `shortfall`, creates a `SHORTFALL_FEE` `PlatformDue`, and sets `penalty_pending` on the subscription. Days with 0 rides are closed with no penalty.
+- The shortfall fee blocks `is_eligible` (go online / accept) until paid through the gateway
+- Locking guarantees two simultaneous completions cannot produce two platform rides in one day
+- Cash platform rides create a due the captain must settle through the gateway; dues over the limit block going online
 
 ### 3.7 Payments
 ```text
@@ -158,6 +180,7 @@ App's "success" callback only triggers a status poll. It never activates anythin
 - Webhook handler is idempotent (unique `provider_payment_id`)
 - Nightly reconciliation job compares gateway records with `Payment` rows
 - Cash rides: captain confirms collection; the backend records it but never trusts the amount from the client
+- Platform dues (ride-share plan): `PlatformDue` rows settled automatically for online-paid rides, or by captain payment verified by webhook for cash rides
 
 ### 3.8 Notifications
 - Event → `Notification` row + FCM push via Celery
@@ -200,13 +223,15 @@ Customer app            Backend                     Redis / Workers            C
   - Partial unique: one non-terminal ride per captain; one non-terminal ride per customer
   - `Payment(provider_payment_id)` unique
   - `CaptainSubscription(captain_id, expires_at)`
+  - `RideShareDay(captain_id, service_date)` unique
+  - `PlatformDue(captain_id, status)`
 - Constraints for statuses (check constraints / enums), `rating` 1–5, `unique(ride_id)` on Rating
 - `RideLocation` is append-only and high volume: partition by month, retain a limited window (e.g. 30–90 days), then archive or drop
 - Money stored as integer paise (or `Decimal`), never float
 
 **Redis keys** (all namespaced by city for later sharding)
 ```text
-geo:captains:{city}              GEO set of ONLINE+available captains
+geo:captains:{city}:{vtype}      GEO set of ONLINE+available captains by vehicle type
 captain:{id}:loc                 hash, TTL 30 s
 captain:{id}:offer               current offer ride id, TTL = offer timeout
 ride:{id}:state                  cached status + captain id
@@ -295,7 +320,7 @@ Environments: local, staging, production
 
 | | Uber | Rapido | Namma Yatri | This project (MVP) |
 |---|---|---|---|---|
-| Business model | Commission | Captain subscription/commission by market | Flat driver subscription | Flat ₹20/day subscription |
+| Business model | Commission | Captain subscription/commission by market | Flat driver subscription | Two plans: ₹30/day or 1 ride's fare a day |
 | Architecture | Large service mesh, own geo indexing (H3), dedicated dispatch | Service-oriented, bike-first, high location volume | Open-source, Beckn protocol, Haskell core + Rust location service | Django monolith, Redis geo |
 | Matching | Global batched optimization | Nearest-captain with fast offers | Nearest-driver offers | Sequential nearest-captain |
 | What you take from it | Geo-cell indexing, state machines, idempotency | Bike-taxi UX, short offer windows | Subscription model, separate location service, protocol openness | Same ideas, minimal moving parts |
@@ -311,10 +336,13 @@ Environments: local, staging, production
 5. All money, fare, status and eligibility decisions are server-side
 6. Cash rides supported at launch; online ride payments added after pilot
 7. Beckn/ONDC compatibility deferred until after launch; keep ride and fare models cleanly separable so a protocol adapter can be added later
-8. Single city, Bike only, but `city` and `vehicle_type` are columns from day one
+8. Single city, Bike and Auto at launch. `city` and `vehicle_type` are columns from day one; `Ride.vehicle_type` is set at request time and used for matching and fares
+9. Fare config (`base_fare`, `per_km`, `minimum_fare`, fees) is keyed by `vehicle_type` (and city later)
+10. Redis geo sets are per city and vehicle type, e.g. `geo:captains:{city}:{vehicle_type}`, so a Bike request never searches Auto captains
 
 ## 13. Open Questions
 
+- Ride-share plan: confirm the surrender rule (any of the first 4 rides, marked before completion), the shortfall rule (₹30 fee plus the next day's first ride as penalty; confirm the penalty ride counts as that day's one platform ride and that zero-ride days are exempt), the day boundary/timezone, and the unpaid-dues limit for cash rides
 - Offer timeout and max attempts: start with 15 s and 5
 - Cancellation fees or captain penalties for repeated rejects
 - Handling of cash-collection disputes

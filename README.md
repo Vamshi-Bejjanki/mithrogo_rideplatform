@@ -1,6 +1,6 @@
 # Ride Platform MVP
 
-Single-city ride-hailing platform (Bike category first). Captains pay a configurable flat daily subscription (initial: ₹20/day) instead of per-ride commission.
+Single-city ride-hailing platform (Bike and Auto categories first). Captains choose one of two plans: a configurable flat daily subscription (initial: ₹30/day), or a ride-share plan where only 1 ride's fare per day (from the first 5 rides) goes to the platform.
 
 Source of truth: [docs/PROJECT_DESIGN.md](docs/PROJECT_DESIGN.md)
 

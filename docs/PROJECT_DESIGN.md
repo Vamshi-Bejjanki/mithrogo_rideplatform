@@ -13,9 +13,12 @@ and one web-based:
 
 The platform's initial business model is:
 
-> Captains pay a fixed platform subscription of ₹20 per day instead of paying a commission on every completed ride.
+> Captains choose one of two plans to use the platform:
+>
+> 1. **Daily plan** — a fixed platform fee of ₹30 per day (configurable), with no share of ride fares.
+> 2. **Ride-share plan ("1 in 5")** — no daily fee. Each day, the fare of only 1 ride goes to the platform, taken from the captain's first 5 rides of that day. The captain may surrender any one of the first 4; if none was surrendered, the 5th ride is taken automatically. Every other ride that day is the captain's to keep, even if they complete 100 rides.
 
-The MVP should focus on **one city and one ride category initially (Bike)**. The architecture must be extensible later to Auto, Car, additional cities, different pricing plans, and other services.
+The MVP should focus on **one city and two ride categories initially (Bike and Auto)**. The architecture must be extensible later to Car, additional cities, different pricing plans, and other services.
 
 This document is the source of truth for MVP development.
 
@@ -64,9 +67,11 @@ KYC submitted
         ↓
 Admin approves captain
         ↓
-Captain pays ₹20 daily platform fee
+Captain chooses a plan
+(₹30 daily OR 1 ride a day, from the first 5)
         ↓
-Subscription becomes ACTIVE
+Daily plan: pays ₹30 → subscription ACTIVE
+Ride-share plan: plan enabled → ACTIVE
         ↓
 Captain can go ONLINE
         ↓
@@ -106,8 +111,9 @@ Captain can receive rides
 - KYC/document submission
 - Vehicle registration
 - Admin approval
-- Daily ₹20 subscription
-- Subscription status
+- Choose plan: ₹30 daily subscription OR ride-share (1 ride's fare a day, from the first 5)
+- Surrender a ride (ride-share plan)
+- Plan/subscription status and platform dues
 - Online/offline status
 - Ride request
 - Accept/reject
@@ -156,7 +162,7 @@ Captain can receive rides
 Do NOT implement initially:
 
 - Multiple cities
-- Auto and Car categories
+- Car category
 - Scheduled rides
 - Corporate accounts
 - Wallet
@@ -479,11 +485,14 @@ created_at
 updated_at
 ```
 
-Initial vehicle type:
+Initial vehicle types:
 
 ```text
 BIKE
+AUTO
 ```
+
+`Ride` also carries `vehicle_type` (the category the customer requested). Matching only offers rides to captains whose verified vehicle matches it, and fare configuration is defined per vehicle type.
 
 ---
 
@@ -575,17 +584,34 @@ created_at
 updated_at
 ```
 
-Initial plan:
+Add to `SubscriptionPlan`:
 
 ```text
-DAILY_20
-amount = 20
-duration_days = 1
+plan_type          DAILY_FLAT | RIDE_SHARE
+qualifying_rides   nullable   (RIDE_SHARE only; initial 5: the platform ride is one of the first N rides of the day)
+shortfall_fee      nullable   (RIDE_SHARE only; initial 30: owed after a shortfall day)
 ```
 
-Do not hard-code ₹20 throughout the codebase.
+Initial plans:
 
-The amount must come from configuration/database.
+```text
+DAILY_30
+plan_type = DAILY_FLAT
+amount = 30
+duration_days = 1
+
+RIDE_SHARE_1_IN_5
+plan_type = RIDE_SHARE
+amount = 0
+qualifying_rides = 5
+shortfall_fee = 30
+```
+
+Do not hard-code ₹30 or the qualifying-ride count of 5 throughout the codebase.
+
+Both values must come from configuration/database.
+
+Both plans apply equally to Bike and Auto captains: the same daily amount and the same qualifying-ride count.
 
 ---
 
@@ -613,6 +639,56 @@ ACTIVE
 EXPIRED
 CANCELLED
 FAILED
+```
+
+A `RIDE_SHARE` subscription has no `expires_at` (open-ended) and is ACTIVE until the captain switches plan, is suspended, or exceeds the allowed unpaid dues. It also carries `penalty_pending` (boolean): set after a shortfall day, and cleared when the next day's first ride is taken as the penalty ride.
+
+---
+
+## RideShareDay
+
+One row per captain per day on the ride-share plan. Tracks how many rides were completed that day and which ride (if any) the platform took.
+
+```text
+RideShareDay
+------------
+id
+captain_id FK
+subscription_id FK
+service_date          date (business day; timezone configurable)
+qualifying_rides      (copied from the plan, initial 5)
+completed_rides       count of completed rides that day
+platform_ride_id      nullable FK Ride (the single ride taken that day)
+status                OPEN | CLOSED (closed by the end-of-day job)
+shortfall             boolean (closed day with at least 1 and fewer than
+                      qualifying_rides completed rides and no platform ride)
+UNIQUE (captain_id, service_date)
+```
+
+Ride additions:
+
+```text
+is_platform_ride      boolean, default false
+platform_share_amount nullable (the final_fare taken by the platform)
+share_reason          nullable  SURRENDERED | AUTO_5TH | PENALTY_FIRST_RIDE
+```
+
+## PlatformDue
+
+Ledger of money a captain owes the platform (needed because cash rides are collected by the captain).
+
+```text
+PlatformDue
+-----------
+id
+captain_id FK
+ride_id nullable FK   (null for a shortfall fee)
+due_type              RIDE_SHARE | SHORTFALL_FEE
+amount
+status                PENDING | SETTLED | WAIVED
+payment_id nullable
+created_at
+settled_at nullable
 ```
 
 ---
@@ -835,7 +911,7 @@ When a ride is requested:
 5. Find captains:
    - approved
    - active
-   - subscription active
+   - plan active (daily subscription ACTIVE, or ride-share plan enabled with dues under the limit)
    - online
    - not busy
    - within configured radius
@@ -920,13 +996,43 @@ final_fare
 
 ---
 
-# 18. Captain ₹20 Subscription
+# 18. Captain Plans (₹30 Daily or 1-in-5 Ride-Share)
 
 Core rule:
 
-> A captain with an ACTIVE subscription can accept rides.
+> A captain with an ACTIVE plan can accept rides.
 
-A captain with an expired subscription:
+## Plan A — Daily ₹30
+
+- Captain pays the daily fee (amount from the plan table)
+- Subscription is ACTIVE until `expires_at`
+- No share of ride fares is taken
+
+## Plan B — Ride-Share (1 ride a day, from the first 5)
+
+- No daily fee
+- At most **one** ride's final fare goes to the platform **per day**, however many rides the captain completes (even 100)
+- The platform ride is one of the captain's first 5 **completed** rides of the day (cancelled rides do not count):
+  - **Surrender:** the captain may mark one of the first 4 rides as the platform's ride, before that ride is completed
+  - **Automatic:** if no ride was surrendered after 4 completed rides, the 5th ride of the day is taken automatically
+- Once the platform ride is taken, every later ride that day is fully the captain's
+- A new day starts a fresh count (day boundary uses a configurable timezone)
+- **Shortfall day:** if a day ends with at least 1 and fewer than 5 completed rides and no ride was surrendered, the captain is penalised the next day:
+  - a `SHORTFALL_FEE` due of ₹30 (configurable `shortfall_fee`) is created, and the captain must pay it before going ONLINE again
+  - the captain's **first completed ride of the next day** is taken by the platform as the penalty ride (reason `PENALTY_FIRST_RIDE`)
+  - the penalty ride counts as that day's one platform ride, so no second ride is taken that day
+- A day with zero completed rides has no shortfall and no penalty
+- The backend decides which ride is the platform ride. Counting, surrender and auto-take run in a single transaction with a lock on the captain's `RideShareDay` row, so two rides completing together cannot both be taken.
+- The platform ride's `final_fare` is recorded as a `PlatformDue`. Online ride payments are settled automatically; for cash rides the captain owes the amount and pays it through the gateway.
+- A captain whose unpaid dues exceed a configurable limit cannot go ONLINE until they settle; an unpaid shortfall fee always blocks going online
+
+## Switching plans
+
+A captain may switch plan only when no ride is in progress. A platform ride already taken today is still owed after switching. Switching to the daily plan requires paying the daily fee. Exact rules to be confirmed with the business owner.
+
+## Expired daily subscription
+
+A captain with an expired daily subscription:
 
 ```text
 Can login
@@ -937,18 +1043,18 @@ Cannot go ONLINE
 Cannot accept new rides
 ```
 
-Do not automatically cancel a ride already in progress merely because a subscription expires.
+Do not automatically cancel a ride already in progress merely because a subscription expires or a plan changes.
 
 ---
 
 # 19. Payment Flow
 
-## Captain Subscription
+## Captain Daily Subscription
 
 ```text
 Captain
    ↓
-Select ₹20 Daily Plan
+Select Daily Plan (₹30)
    ↓
 Create payment order
    ↓
@@ -966,6 +1072,21 @@ expires_at = start_at + 1 day
 Never activate subscription solely because the mobile app says payment succeeded.
 
 The backend must verify the payment with the payment provider/webhook.
+
+## Ride-Share Dues
+
+For a platform ride on the 1-in-5 plan:
+
+```text
+Ride completed
+   ↓
+Backend decides if this is the platform ride (surrendered or 5th)
+   ↓
+PlatformDue created for final_fare
+   ↓
+Online payment: platform keeps the fare, due settled automatically
+Cash payment:   captain owes the fare, pays via gateway (verified by webhook)
+```
 
 ---
 
@@ -1411,11 +1532,11 @@ The product is a single-city ride-hailing MVP with:
 
 The initial business model is:
 
-- Captains pay a configurable fixed daily platform subscription.
-- Initial plan: ₹20 for 1 day.
-- Captains do not pay a per-ride commission in the MVP.
-- A captain with an expired subscription cannot go online or accept new rides.
-- The ₹20 value must be stored/configured through the subscription plan system and must NOT be hard-coded throughout the application.
+- Captains choose one of two plans:
+  1. Daily plan: configurable fixed daily fee. Initial: ₹30 for 1 day.
+  2. Ride-share plan: no daily fee; only 1 ride's fare per day goes to the platform, taken from the captain's first 5 rides. The captain may surrender one of the first 4; otherwise the 5th is taken automatically. All other rides that day are free of any share.
+- A captain with an expired daily subscription cannot go online or accept new rides.
+- The ₹30 value and the qualifying-ride count of 5 must be stored/configured through the subscription plan system and must NOT be hard-coded throughout the application.
 
 IMPORTANT DEVELOPMENT RULES:
 
@@ -1561,7 +1682,10 @@ Requirements:
 - CaptainSubscription
 - configurable plan amount
 - configurable duration
-- initial plan ₹20 / 1 day
+- plan types DAILY_FLAT and RIDE_SHARE
+- initial plans: ₹30 / 1 day, and ride-share (1 ride a day from the first 5; qualifying-ride count configurable)
+- RideShareDay counting, surrender of one of the first 4 rides, automatic 5th-ride take, no further charge that day
+- PlatformDue ledger
 - ACTIVE/EXPIRED/etc. statuses
 - subscription history
 - backend validation
@@ -1578,6 +1702,8 @@ Write tests for:
 - expired subscription
 - captain eligibility
 - duplicate/invalid activation
+- ride-share: 5th ride auto-taken, surrender within first 4, cancelled rides not counted, only one platform ride per day (rides after it are free), new day resets, shortfall day creates the fee and next-day first-ride penalty, zero-ride day has no penalty, unpaid shortfall fee blocks going online, concurrent completions
+- dues limit blocks going online
 
 Run tests.
 Stop after completion.
@@ -1679,8 +1805,8 @@ It is complete when this real test works:
 2. Captain logs in
 3. Captain submits KYC
 4. Admin approves captain
-5. Captain pays ₹20 test subscription
-6. Subscription becomes ACTIVE
+5. Captain pays ₹30 test subscription (or enables the 1-in-5 ride-share plan)
+6. Plan becomes ACTIVE
 7. Captain goes ONLINE
 8. Customer requests a ride
 9. Backend finds captain
@@ -1699,6 +1825,10 @@ It is complete when this real test works:
 22. Captain cannot accept another ride
 23. Captain renews subscription
 24. Captain can go online again
+25. Ride-share plan: after 4 rides without surrender, the 5th ride is taken and recorded as a platform due
+26. Ride-share plan: surrendering one of the first 4 rides is recorded and the 5th ride is not taken
+27. Ride-share plan: rides after the platform ride that day are not charged, and the next day starts a fresh count
+28. Ride-share plan: a day with fewer than 5 rides and no surrender creates a ₹30 fee, blocks going online until it is paid, and takes the first ride of the next day as the penalty ride
 ```
 
 Only after this flow is stable should the platform be treated as an MVP ready for a controlled pilot.
@@ -1736,7 +1866,7 @@ It is:
 
 > **Completed rides per active captain per day.**
 
-If captains pay ₹20/day but don't receive enough rides, the business model will fail regardless of how good the app looks.
+If captains pay ₹30/day, or give up 1 ride a day, but don't receive enough rides, the business model will fail regardless of how good the app looks.
 
 ---
 
@@ -1746,7 +1876,6 @@ Only after the MVP proves demand:
 
 ```text
 Phase 2
-- Auto
 - Car
 - More cities
 - Monthly captain plans

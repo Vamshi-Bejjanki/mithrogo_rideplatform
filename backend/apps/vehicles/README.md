@@ -2,6 +2,6 @@
 
 `Vehicle` (captain FK, type, registration number, make/model/color, is_verified).
 
-- Initial type: `BIKE`; designed to extend to Auto/Car
+- Initial types: `BIKE`, `AUTO`; designed to extend to Car
 - APIs: `POST/GET /captains/vehicles/`
 - Admin verifies vehicles

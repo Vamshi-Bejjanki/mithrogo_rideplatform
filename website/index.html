@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MithroGo – Bike and Auto rides, fair for riders and captains</title>
+<meta name="description" content="Book a bike or auto ride in minutes. Captains choose a simple plan: ₹30 a day, or the fare of just 1 ride a day.">
+<style>
+  :root{
+    --bg:#ffffff; --bg-alt:#f5f7fa; --text:#14181f; --muted:#5b6573;
+    --brand:#0b8f5a; --brand-dark:#086f46; --brand-soft:#e3f5ec;
+    --card:#ffffff; --border:#e3e7ee; --radius:14px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0e1116; --bg-alt:#151a22; --text:#eef1f6; --muted:#9aa5b5;
+      --brand:#2bc884; --brand-dark:#1fa56b; --brand-soft:#12261d;
+      --card:#171c25; --border:#262d39;
+    }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text)}
+  a{color:inherit}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+  header.nav{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--border)}
+  .nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .logo{font-weight:800;font-size:1.25rem;text-decoration:none;color:var(--brand)}
+  .nav nav{display:flex;gap:22px;align-items:center}
+  .nav nav a{text-decoration:none;color:var(--muted);font-size:.95rem}
+  .nav nav a:hover{color:var(--text)}
+  .nav nav a.btn-primary,.nav nav a.btn-primary:hover{color:#fff}
+  .btn{display:inline-block;padding:12px 22px;border-radius:999px;font-weight:600;text-decoration:none;border:1px solid transparent}
+  .btn-primary{background:var(--brand);color:#fff}
+  .btn-primary:hover{background:var(--brand-dark)}
+  .btn-ghost{border-color:var(--border);color:var(--text)}
+  .btn-ghost:hover{background:var(--bg-alt)}
+  .hero{padding:72px 0 56px}
+  .hero .wrap{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center}
+  .eyebrow{display:inline-block;background:var(--brand-soft);color:var(--brand);font-weight:600;font-size:.85rem;padding:4px 12px;border-radius:999px}
+  h1{font-size:clamp(2rem,5vw,3.2rem);line-height:1.15;margin:16px 0}
+  .lead{color:var(--muted);font-size:1.15rem;max-width:520px}
+  .cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:28px}
+  .hero-card{background:var(--bg-alt);border:1px solid var(--border);border-radius:20px;padding:24px}
+  .route{display:grid;gap:14px}
+  .stop{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+  .dot{width:12px;height:12px;border-radius:50%;background:var(--brand);flex:none}
+  .dot.drop{border-radius:3px;background:var(--text)}
+  .stop small{display:block;color:var(--muted)}
+  .fare{display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-weight:600}
+  .fare span:last-child{color:var(--brand);font-size:1.3rem}
+  section{padding:64px 0}
+  section.alt{background:var(--bg-alt)}
+  h2{font-size:clamp(1.5rem,3.5vw,2.1rem);margin:0 0 8px}
+  .sub{color:var(--muted);margin:0 0 36px;max-width:620px}
+  .grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:22px}
+  .card h3{margin:10px 0 6px;font-size:1.05rem}
+  .card p{margin:0;color:var(--muted);font-size:.95rem}
+  .num{width:34px;height:34px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:700}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  .panel{border:1px solid var(--border);border-radius:var(--radius);padding:28px;background:var(--card)}
+  .panel.hl{background:var(--brand-soft);border-color:transparent}
+  .panel ul{padding-left:20px;color:var(--muted)}
+  .panel li{margin:6px 0}
+  details{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:12px}
+  summary{cursor:pointer;font-weight:600}
+  details p{color:var(--muted);margin:10px 0 0}
+  .download{text-align:center}
+  .download .cta{justify-content:center}
+  footer{border-top:1px solid var(--border);padding:32px 0;color:var(--muted);font-size:.9rem}
+  footer .wrap{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between}
+  footer a{margin-right:16px;text-decoration:none}
+  @media (max-width:760px){
+    .hero .wrap,.split{grid-template-columns:1fr}
+    .nav nav a:not(.btn){display:none}
+    .hero{padding-top:40px}
+  }
+
+  /* hero animation */
+  :root{
+    --scene-sky:#dff3ea; --scene-sun:#ffd54a; --scene-city:#b9d9ca; --scene-road:#3a414c;
+    --scene-lane:#f4f6f8; --scene-glass:#cfe9f5; --scene-cloud:#ffffff; --scene-ink:#14181f;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --scene-sky:#16241f; --scene-sun:#e9c545; --scene-city:#22362e; --scene-road:#10141a;
+      --scene-lane:#8a94a3; --scene-glass:#2c4a5c; --scene-cloud:#2a3a36; --scene-ink:#eef1f6;
+    }
+  }
+  .scene{display:block;width:100%;height:auto;border-radius:14px;margin-bottom:16px}
+  .scene .spin{transform-origin:0 0;animation:spin .7s linear infinite}
+  .scene .bounce{animation:bounce .45s ease-in-out infinite alternate}
+  .scene .run{animation:run linear infinite}
+  .scene .run.bike{animation-duration:7s}
+  .scene .run.auto{animation-duration:10s;animation-delay:-4s}
+  .scene .dash{animation:dash 1s linear infinite}
+  .scene .cloud{animation:drift linear infinite}
+  .scene .cloud.c1{animation-duration:38s}
+  .scene .cloud.c2{animation-duration:52s;animation-delay:-20s}
+  .scene .speed{animation:flicker .5s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-1.6px)}}
+  @keyframes run{from{transform:translateX(-130px)}to{transform:translateX(520px)}}
+  @keyframes dash{to{stroke-dashoffset:-36}}
+  @keyframes drift{from{transform:translateX(-80px)}to{transform:translateX(560px)}}
+  @keyframes flicker{0%,100%{opacity:.15}50%{opacity:.6}}
+  @media (prefers-reduced-motion: reduce){
+    .scene *{animation:none !important}
+    .scene .run.bike{transform:translateX(120px)}
+    .scene .run.auto{transform:translateX(280px)}
+  }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="logo" href="#">MithroGo</a>
+    <nav>
+      <a href="#how">How it works</a>
+      <a href="#captains">Drive with us</a>
+      <a href="#safety">Safety</a>
+      <a href="#faq">FAQ</a>
+      <a class="btn btn-primary" href="#download">Get the app</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <span class="eyebrow">Now starting in our first city</span>
+        <h1>Quick bike and auto rides. Fair for riders and captains.</h1>
+        <p class="lead">Book a bike or auto in a few taps, see your captain arrive on the map, and pay a clear fare. Captains choose a simple plan: a small daily fee, or give the fare of just 1 ride a day.</p>
+        <div class="cta">
+          <a class="btn btn-primary" href="#download">Book a ride</a>
+          <a class="btn btn-ghost" href="#captains">Become a captain</a>
+        </div>
+      </div>
+      <div class="hero-card" aria-hidden="true">
+        <svg class="scene" viewBox="0 0 480 270" role="img" aria-label="A bike and an auto driving along a city road">
+        <rect width="480" height="270" fill="var(--scene-sky)"/>
+        <circle cx="414" cy="48" r="24" fill="var(--scene-sun)"/>
+        <g class="cloud c1"><ellipse cx="60" cy="52" rx="30" ry="11" fill="var(--scene-cloud)"/><ellipse cx="84" cy="46" rx="20" ry="10" fill="var(--scene-cloud)"/></g>
+        <g class="cloud c2"><ellipse cx="40" cy="92" rx="24" ry="9" fill="var(--scene-cloud)"/><ellipse cx="58" cy="87" rx="16" ry="8" fill="var(--scene-cloud)"/></g>
+        <g fill="var(--scene-city)">
+          <rect x="10" y="96" width="34" height="48"/><rect x="50" y="76" width="28" height="68"/>
+          <rect x="84" y="104" width="40" height="40"/><rect x="132" y="68" width="30" height="76"/>
+          <rect x="170" y="92" width="36" height="52"/><rect x="214" y="108" width="30" height="36"/>
+          <rect x="252" y="82" width="34" height="62"/><rect x="294" y="100" width="40" height="44"/>
+          <rect x="342" y="72" width="28" height="72"/><rect x="378" y="94" width="36" height="50"/>
+          <rect x="422" y="110" width="48" height="34"/>
+        </g>
+        <rect y="140" width="480" height="130" fill="var(--scene-road)"/>
+        <line class="dash" x1="0" y1="206" x2="480" y2="206" stroke="var(--scene-lane)" stroke-width="3" stroke-dasharray="22 14" stroke-linecap="round"/>
+
+        <!-- bike -->
+        <g transform="translate(0,188)">
+          <g class="run bike">
+            <g class="speed" stroke="var(--scene-lane)" stroke-width="2" stroke-linecap="round"><line x1="-26" y1="-24" x2="-10" y2="-24"/><line x1="-34" y1="-38" x2="-14" y2="-38"/></g>
+            <g class="bounce">
+              <path d="M14 -14 L36 -34 L58 -34 L70 -14 M36 -34 L44 -14 M58 -34 L62 -50 M56 -50 L68 -50 M62 -38 L70 -14" fill="none" stroke="var(--brand)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="30" y1="-39" x2="42" y2="-39" stroke="var(--scene-ink)" stroke-width="5" stroke-linecap="round"/>
+              <path d="M38 -41 L47 -62 M47 -60 L62 -51 M38 -41 L52 -30 L47 -16" fill="none" stroke="var(--scene-ink)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="49" cy="-71" r="8" fill="#f2c9a0"/>
+              <path d="M41 -73 Q49 -84 58 -73 Z" fill="var(--brand)"/>
+            </g>
+            <g transform="translate(14,-14)"><g class="spin">
+            <circle r="14" fill="var(--scene-sky)" stroke="var(--scene-ink)" stroke-width="4"/>
+            <line x1="-11" y1="0" x2="11" y2="0" stroke="var(--scene-ink)" stroke-width="2"/>
+            <line x1="0" y1="-11" x2="0" y2="11" stroke="var(--scene-ink)" stroke-width="2"/>
+            <circle r="3" fill="var(--scene-ink)"/>
+          </g></g>
+            <g transform="translate(70,-14)"><g class="spin">
+            <circle r="14" fill="var(--scene-sky)" stroke="var(--scene-ink)" stroke-width="4"/>
+            <line x1="-11" y1="0" x2="11" y2="0" stroke="var(--scene-ink)" stroke-width="2"/>
+            <line x1="0" y1="-11" x2="0" y2="11" stroke="var(--scene-ink)" stroke-width="2"/>
+            <circle r="3" fill="var(--scene-ink)"/>
+          </g></g>
+          </g>
+        </g>
+
+        <!-- auto -->
+        <g transform="translate(0,252)">
+          <g class="run auto">
+            <g class="speed" stroke="var(--scene-lane)" stroke-width="2" stroke-linecap="round"><line x1="-30" y1="-26" x2="-12" y2="-26"/><line x1="-40" y1="-44" x2="-16" y2="-44"/></g>
+            <g class="bounce">
+              <path d="M8 -46 L8 -72 Q8 -80 18 -80 L72 -80 Q78 -80 82 -72 L96 -46 Z" fill="#f4c20d"/>
+              <rect x="22" y="-72" width="34" height="20" rx="4" fill="var(--scene-glass)"/>
+              <circle cx="39" cy="-62" r="7" fill="#f2c9a0"/>
+              <path d="M62 -74 L74 -74 L86 -52 L62 -52 Z" fill="var(--scene-glass)"/>
+              <rect x="4" y="-48" width="100" height="28" rx="9" fill="var(--brand)"/>
+              <path d="M80 -48 Q104 -46 110 -30 L110 -22 L80 -22 Z" fill="var(--brand)"/>
+              <circle cx="108" cy="-33" r="3.5" fill="#fff6c2"/>
+              <rect x="30" y="-40" width="26" height="8" rx="3" fill="#ffffff" opacity=".85"/>
+            </g>
+            <g transform="translate(26,-16)"><g class="spin">
+            <circle r="16" fill="var(--scene-sky)" stroke="var(--scene-ink)" stroke-width="4"/>
+            <line x1="-13" y1="0" x2="13" y2="0" stroke="var(--scene-ink)" stroke-width="2"/>
+            <line x1="0" y1="-13" x2="0" y2="13" stroke="var(--scene-ink)" stroke-width="2"/>
+            <circle r="3" fill="var(--scene-ink)"/>
+          </g></g>
+            <g transform="translate(92,-16)"><g class="spin">
+            <circle r="16" fill="var(--scene-sky)" stroke="var(--scene-ink)" stroke-width="4"/>
+            <line x1="-13" y1="0" x2="13" y2="0" stroke="var(--scene-ink)" stroke-width="2"/>
+            <line x1="0" y1="-13" x2="0" y2="13" stroke="var(--scene-ink)" stroke-width="2"/>
+            <circle r="3" fill="var(--scene-ink)"/>
+          </g></g>
+          </g>
+        </g>
+      </svg>
+        <div class="route">
+          <div class="stop"><span class="dot"></span><div><small>Pickup</small>Your current location</div></div>
+          <div class="stop"><span class="dot drop"></span><div><small>Drop</small>Where to?</div></div>
+        </div>
+        <div class="fare"><span>Estimated fare</span><span>Shown before you book</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="how" class="alt">
+    <div class="wrap">
+      <h2>How it works</h2>
+      <p class="sub">From request to destination in four simple steps.</p>
+      <div class="grid">
+        <div class="card"><div class="num">1</div><h3>Set pickup and drop</h3><p>Choose where you are and where you want to go.</p></div>
+        <div class="card"><div class="num">2</div><h3>See the fare</h3><p>Get an estimated fare up front, before you request.</p></div>
+        <div class="card"><div class="num">3</div><h3>Meet your captain</h3><p>Nearby captain accepts. Track them live as they arrive.</p></div>
+        <div class="card"><div class="num">4</div><h3>Ride, pay, rate</h3><p>Pay at the end of the trip and rate your captain.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="captains">
+    <div class="wrap">
+      <h2>Drive with MithroGo</h2>
+      <p class="sub">Two simple ways to pay. Pick the one that suits you.</p>
+      <div class="split">
+        <div class="panel hl">
+          <h3>Choose your plan</h3>
+          <p><strong>Plan A – ₹30 a day.</strong> Pay a small fixed fee for each day you want to take rides. Everything you earn from fares is yours.</p>
+          <p><strong>Plan B – 1 ride a day.</strong> No daily fee. Give the fare of just 1 of your first 5 rides each day. Choose which of your first 4 rides to give, or the 5th is taken automatically. Every other ride that day is yours, even if you do 100. If a day ends with fewer than 5 rides and you haven&rsquo;t given one, you pay ₹30 and your first ride the next day is taken.</p>
+          <ul>
+            <li>Choose when to go online</li>
+            <li>See your earnings in the app</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Get started</h3>
+          <ul>
+            <li>Sign up with your phone number</li>
+            <li>Submit your licence and vehicle documents</li>
+            <li>Get approved by our team</li>
+            <li>Choose your plan and go online</li>
+          </ul>
+          <a class="btn btn-primary" href="#download">Download the Captain app</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="safety" class="alt">
+    <div class="wrap">
+      <h2>Built with safety in mind</h2>
+      <p class="sub">Every ride is tracked and every captain is verified.</p>
+      <div class="grid">
+        <div class="card"><h3>Verified captains</h3><p>Documents and vehicles are reviewed before a captain can take rides.</p></div>
+        <div class="card"><h3>Live ride tracking</h3><p>Follow your trip on the map from pickup to drop.</p></div>
+        <div class="card"><h3>Ratings both ways</h3><p>Customers and captains rate each ride to keep quality high.</p></div>
+        <div class="card"><h3>Support when needed</h3><p>Report an issue from any past ride, right in the app.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap">
+      <h2>Frequently asked questions</h2>
+      <p class="sub">&nbsp;</p>
+      <details><summary>Which cities are you in?</summary><p>We are launching in one city first. More cities will follow once the service is running well.</p></details>
+      <details><summary>What vehicles are available?</summary><p>Bike and Auto rides are available at launch. More ride types will be added later.</p></details>
+      <details><summary>How do I pay for a ride?</summary><p>You will see the fare estimate before booking. Payment options are shown in the app at the end of the ride.</p></details>
+      <details><summary>How much does a captain pay?</summary><p>Two ways: ₹30 a day, or give the fare of just 1 ride a day. With the second plan you choose which of your first 4 rides to give; if you don't, the 5th ride is taken automatically. Every other ride that day is yours. If you finish a day with fewer than 5 rides and haven't given one, the next day you pay ₹30 and your first ride is taken.</p></details>
+      <details><summary>How do I report a problem?</summary><p>Open the ride in the app and use Help / Report an issue, or contact us using the email below.</p></details>
+    </div>
+  </section>
+
+  <section id="download" class="alt download">
+    <div class="wrap">
+      <h2>Get the app</h2>
+      <p class="sub" style="margin-inline:auto">Download the app for your role.</p>
+      <div class="cta">
+        <!-- TODO: replace # with real store links after publishing -->
+        <a class="btn btn-primary" href="#">Customer app – Google Play</a>
+        <a class="btn btn-ghost" href="#">Captain app – Google Play</a>
+      </div>
+      <p class="sub" style="margin:18px auto 0">iOS apps coming soon.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>© <span id="y"></span> MithroGo. All rights reserved.</div>
+    <div>
+      <!-- TODO: add real pages and contact email before launch -->
+      <a href="privacy.html">Privacy policy</a>
+      <a href="terms.html">Terms</a>
+      <a href="mailto:support@example.com">support@example.com</a>
+    </div>
+  </div>
+</footer>
+
+<script>document.getElementById('y').textContent = new Date().getFullYear();</script>
+</body>
+</html>
