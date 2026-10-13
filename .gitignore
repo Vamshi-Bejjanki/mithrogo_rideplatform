@@ -1,0 +1,16 @@
+# IDE files
+.idea/caches/
+.idea/workspace.xml
+
+# Flutter / Dart
+**/.dart_tool/
+**/.packages
+**/build/
+**/coverage/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
