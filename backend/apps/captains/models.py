@@ -20,7 +20,7 @@ class OnlineStatus(models.TextChoices):
 
 class CaptainProfile(TimeStampedModel):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="captain_profile")
-    profile_photo = models.ImageField(upload_to="captains/photos/", blank=True, null=True)
+    profile_photo = models.FileField(upload_to="captains/photos/", blank=True, null=True)
     date_of_birth = models.DateField(null=True, blank=True)
     address = models.TextField(blank=True)
     license_number = models.CharField(max_length=40, blank=True)

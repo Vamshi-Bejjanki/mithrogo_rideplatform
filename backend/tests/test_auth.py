@@ -2,7 +2,8 @@ import pytest
 
 from apps.customers.models import CustomerProfile
 from apps.users.models import User
-from tests.helpers import make_user, new_phone
+from apps.users.models import OtpChallenge
+from tests.helpers import last_code_sent_to, make_user, new_phone
 
 from apps.users.models import Role
 
@@ -13,7 +14,8 @@ VERIFY = "/api/v1/auth/verify-otp/"
 def send_code(api, phone):
     response = api.post(SEND, {"phone": phone}, format="json")
     assert response.status_code == 200, response.content
-    return response.json()["dev_code"]
+    assert "dev_code" not in response.json()
+    return last_code_sent_to(phone)
 
 
 @pytest.mark.django_db
@@ -145,3 +147,29 @@ def test_admin_role_cannot_use_otp_login(api):
     response = api.post(VERIFY, {"phone": admin.phone, "code": code, "role": "CAPTAIN"}, format="json")
 
     assert response.status_code == 403
+
+
+
+@pytest.mark.django_db
+def test_code_is_only_delivered_by_sms(api):
+    phone = new_phone()
+
+    response = api.post(SEND, {"phone": phone}, format="json")
+
+    assert response.status_code == 200
+    assert response.json() == {"detail": "Code sent."}
+    assert last_code_sent_to(phone)
+
+
+@pytest.mark.django_db
+def test_failed_sms_is_reported_and_leaves_no_usable_code(api):
+    from tests.helpers import CapturingSmsProvider
+
+    phone = new_phone()
+    CapturingSmsProvider.fail = True
+
+    response = api.post(SEND, {"phone": phone}, format="json")
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "sms_failed"
+    assert not OtpChallenge.objects.filter(phone=phone).exists()

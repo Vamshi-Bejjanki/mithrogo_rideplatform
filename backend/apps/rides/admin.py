@@ -1,7 +1,24 @@
 from django.contrib import admin
 
 from core.admin import AuditedModelAdmin
-from apps.rides.models import FareConfig, Rating, Ride, RideEvent, RideOffer
+from apps.rides.models import ACTIVE_STATUSES, FareConfig, Rating, Ride, RideEvent, RideOffer
+
+
+class LiveRideFilter(admin.SimpleListFilter):
+    """Quick switch between rides in progress (the live view) and finished ones."""
+
+    title = "live"
+    parameter_name = "live"
+
+    def lookups(self, request, model_admin):
+        return [("active", "Live now"), ("finished", "Finished")]
+
+    def queryset(self, request, queryset):
+        if self.value() == "active":
+            return queryset.filter(status__in=ACTIVE_STATUSES)
+        if self.value() == "finished":
+            return queryset.exclude(status__in=ACTIVE_STATUSES)
+        return queryset
 
 
 class RideEventInline(admin.TabularInline):
@@ -44,7 +61,15 @@ class RideAdmin(admin.ModelAdmin):
         "is_platform_ride",
         "requested_at",
     )
-    list_filter = ("status", "vehicle_type", "payment_method", "payment_status", "is_platform_ride")
+    list_filter = (
+        LiveRideFilter,
+        "status",
+        "vehicle_type",
+        "payment_method",
+        "payment_status",
+        "is_platform_ride",
+    )
+    date_hierarchy = "requested_at"
     search_fields = ("id", "customer__phone", "captain__user__phone", "pickup_address", "drop_address")
     readonly_fields = [f.name for f in Ride._meta.fields]
     inlines = [RideEventInline, RideOfferInline]

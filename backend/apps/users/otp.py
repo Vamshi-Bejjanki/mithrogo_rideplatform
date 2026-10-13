@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import logging
 import secrets
 from datetime import timedelta
 
@@ -9,6 +10,8 @@ from django.utils.module_loading import import_string
 
 from core.exceptions import DomainError, RateLimited
 from apps.users.models import OtpChallenge
+
+logger = logging.getLogger(__name__)
 
 
 def _code_hash(phone, code):
@@ -28,9 +31,14 @@ def issue_otp(phone):
         code_hash=_code_hash(phone, code),
         expires_at=now + timedelta(seconds=settings.OTP_TTL_SECONDS),
     )
-    provider = import_string(settings.SMS_PROVIDER)()
-    provider.send(phone, f"Your MithroGo code is {code}. It expires in {settings.OTP_TTL_SECONDS // 60} minutes.")
-    return code
+    try:
+        provider = import_string(settings.SMS_PROVIDER)()
+        provider.send_otp(phone, code, settings.OTP_TTL_SECONDS // 60)
+    except Exception:
+        # Do not leave a code behind that the user never received.
+        OtpChallenge.objects.filter(phone=phone, code_hash=_code_hash(phone, code)).delete()
+        logger.exception("SMS delivery failed for %s", phone)
+        raise DomainError("We could not send the code. Please try again.", code="sms_failed")
 
 
 def verify_otp(phone, code):

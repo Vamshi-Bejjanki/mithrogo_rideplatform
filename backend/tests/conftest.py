@@ -16,6 +16,16 @@ def _clear_cache():
     cache.clear()
 
 
+@pytest.fixture(autouse=True)
+def _capture_sms(settings):
+    from tests.helpers import CapturingSmsProvider
+
+    CapturingSmsProvider.sent = []
+    CapturingSmsProvider.fail = False
+    settings.SMS_PROVIDER = "tests.helpers.CapturingSmsProvider"
+    yield
+
+
 @pytest.fixture
 def clock(monkeypatch):
     """Controllable 'now' for offer timeouts and ride-share day boundaries."""

@@ -1,0 +1,18 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{{ title }} | MithroGo Operations{% endblock %}
+
+{% block branding %}
+<h1 id="site-name"><a href="{% url 'admin:index' %}">MithroGo Operations</a></h1>
+<span class="mithro-tag">Admin</span>
+{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+  #header { background: #0b8f5a; }
+  #site-name a { color: #fff; }
+  .mithro-tag { color: #d9f5e8; font-size: .8rem; margin-left: 10px; text-transform: uppercase; letter-spacing: .08em; }
+  .module h2, .module caption { background: #086f46; }
+</style>
+{% endblock %}

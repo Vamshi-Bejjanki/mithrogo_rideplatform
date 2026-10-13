@@ -112,3 +112,22 @@ def captured_event(payment):
         "provider_payment_id": f"pay_{payment.id.hex[:12]}",
         "amount": str(payment.amount),
     }
+
+
+class CapturingSmsProvider:
+    """Test SMS sender: records each OTP so tests can read the code the user would receive."""
+
+    sent = []
+    fail = False
+
+    def send_otp(self, phone, code, ttl_minutes):
+        if CapturingSmsProvider.fail:
+            raise RuntimeError("gateway down")
+        CapturingSmsProvider.sent.append((phone, code))
+
+
+def last_code_sent_to(phone):
+    for sent_phone, code in reversed(CapturingSmsProvider.sent):
+        if sent_phone == phone:
+            return code
+    raise AssertionError(f"no SMS was sent to {phone}")

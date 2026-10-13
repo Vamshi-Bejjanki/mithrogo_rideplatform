@@ -69,6 +69,9 @@ Nothing here is hard-coded in views. Changing a value in admin takes effect on t
 
 ## API map (`/api/v1/`)
 
+Full reference with request bodies, status codes, and a test sequence: [docs/api.md](../docs/api.md).
+
+
 | Area | Endpoints |
 |---|---|
 | Health | `GET health/` |

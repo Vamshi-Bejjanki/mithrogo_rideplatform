@@ -14,6 +14,22 @@ from django.core.exceptions import ImproperlyConfigured
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def load_dotenv(path):
+    """Load KEY=VALUE lines from a .env file. Variables already set in the environment win."""
+    if not path.exists():
+        return
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        value = value.strip().strip('"').strip("'")
+        os.environ.setdefault(key.strip(), value)
+
+
+load_dotenv(BASE_DIR / ".env")
+
+
 def env_bool(name, default=False):
     value = os.environ.get(name)
     if value is None:
@@ -75,7 +91,7 @@ ASGI_APPLICATION = "config.asgi.application"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -151,13 +167,16 @@ SIMPLE_JWT = {
     "SIGNING_KEY": SECRET_KEY,
 }
 
-# OTP. The SMS provider is pluggable; the console provider only logs (development).
+# OTP login. Codes are always sent by SMS in production. The console provider is development only.
 OTP_LENGTH = 6
 OTP_TTL_SECONDS = 300
 OTP_MAX_ATTEMPTS = 5
 OTP_MAX_SENDS_PER_HOUR = 5
-OTP_RETURN_CODE_FOR_DEV = env_bool("OTP_RETURN_CODE_FOR_DEV", False)  # never enable in production
-SMS_PROVIDER = os.environ.get("SMS_PROVIDER", "apps.users.sms.ConsoleSmsProvider")
+SMS_PROVIDER = os.environ.get("SMS_PROVIDER", "apps.users.sms.ConsoleSmsProvider" if DEBUG else "apps.users.sms.Msg91SmsProvider")
+if not SMS_PROVIDER:
+    raise ImproperlyConfigured("SMS_PROVIDER must be set when DJANGO_DEBUG is off.")
+MSG91_AUTH_KEY = os.environ.get("MSG91_AUTH_KEY", "")
+MSG91_TEMPLATE_ID = os.environ.get("MSG91_TEMPLATE_ID", "")
 
 # Payments. The mock provider is used until a real gateway is integrated.
 PAYMENT_PROVIDER = os.environ.get("PAYMENT_PROVIDER", "apps.payments.providers.MockPaymentProvider")
