@@ -140,3 +140,15 @@ def test_non_staff_users_cannot_open_admin():
 
     assert response.status_code == 302
     assert "/admin/login/" in response["Location"]
+
+
+@pytest.mark.django_db
+def test_admin_pages_show_mithrogo_branding_and_live_rides_filter(staff):
+    client, _ = staff
+
+    page = client.get("/admin/")
+    live = client.get("/admin/rides/ride/?live=active")
+
+    assert "MithroGo Operations" in page.content.decode()
+    assert live.status_code == 200
+    assert "Live now" in live.content.decode()

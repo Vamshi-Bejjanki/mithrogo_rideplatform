@@ -1,4 +1,3 @@
-from django.conf import settings
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -22,11 +21,8 @@ class SendOtpView(APIView):
     def post(self, request):
         serializer = SendOtpSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        code = otp.issue_otp(serializer.validated_data["phone"])
-        body = {"detail": "Code sent."}
-        if settings.OTP_RETURN_CODE_FOR_DEV:
-            body["dev_code"] = code  # development only; the flag is off unless set explicitly
-        return Response(body, status=status.HTTP_200_OK)
+        otp.issue_otp(serializer.validated_data["phone"])
+        return Response({"detail": "Code sent."}, status=status.HTTP_200_OK)
 
 
 class VerifyOtpView(APIView):
