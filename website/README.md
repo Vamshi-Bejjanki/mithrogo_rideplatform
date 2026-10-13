@@ -8,3 +8,5 @@ Public marketing website (not part of the core MVP ride flow).
 - Contact / support, privacy policy, terms (required for app store listings)
 
 Suggested stack: Next.js or plain static site. Read-only; talks to the backend only for contact/lead forms if needed.
+
+- `privacy.html` and `terms.html` are drafts, marked for legal review. Replace `support@example.com` and the [TBD] items before launch.

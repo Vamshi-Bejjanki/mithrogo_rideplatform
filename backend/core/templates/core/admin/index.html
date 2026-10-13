@@ -1,0 +1,26 @@
+{% extends "admin/index.html" %}
+
+{% block content %}
+<style>
+  .metric-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); margin: 12px 0 24px; }
+  .metric-card { background: var(--body-bg, #fff); border: 1px solid var(--hairline-color, #ddd); border-radius: 8px; padding: 14px 16px; }
+  .metric-card .value { font-size: 1.6rem; font-weight: 700; }
+  .metric-card .label { color: var(--body-quiet-color, #666); font-size: .85rem; }
+</style>
+
+<div class="metric-grid">
+  <div class="metric-card"><div class="value">{{ metrics.total_customers }}</div><div class="label">Total customers</div></div>
+  <div class="metric-card"><div class="value">{{ metrics.total_captains }}</div><div class="label">Total captains</div></div>
+  <div class="metric-card"><div class="value">{{ metrics.online_captains }}</div><div class="label">Online captains</div></div>
+  <div class="metric-card"><div class="value">{{ metrics.pending_kyc }}</div><div class="label">Pending KYC</div></div>
+  <div class="metric-card"><div class="value">{{ metrics.active_rides }}</div><div class="label">Active rides (live)</div></div>
+  <div class="metric-card"><div class="value">{{ metrics.completed_today }}</div><div class="label">Completed today</div></div>
+  <div class="metric-card"><div class="value">{{ metrics.cancelled_today }}</div><div class="label">Cancelled today</div></div>
+  <div class="metric-card"><div class="value">₹{{ metrics.subscription_revenue }}</div><div class="label">Subscription revenue</div></div>
+  <div class="metric-card"><div class="value">₹{{ metrics.ride_revenue }}</div><div class="label">Ride revenue</div></div>
+  <div class="metric-card"><div class="value">₹{{ metrics.pending_platform_dues }}</div><div class="label">Pending platform dues</div></div>
+  <div class="metric-card"><div class="value">{{ metrics.open_tickets }}</div><div class="label">Open complaints</div></div>
+</div>
+
+{{ block.super }}
+{% endblock %}
