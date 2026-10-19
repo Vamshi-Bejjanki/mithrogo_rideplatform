@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.db import models
 
+from apps.vehicles.models import VehicleType
 from core.models import TimeStampedModel
 
 
@@ -16,7 +17,16 @@ class SubscriptionPlan(TimeStampedModel):
     name = models.CharField(max_length=80)
     plan_type = models.CharField(max_length=20, choices=PlanType.choices)
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    duration_days = models.PositiveIntegerField(null=True, blank=True, help_text="Daily plans only.")
+    duration_hours = models.PositiveIntegerField(
+        null=True, blank=True, help_text="Daily plans only: how long one purchase lasts."
+    )
+    vehicle_type = models.CharField(
+        max_length=10,
+        choices=VehicleType.choices,
+        null=True,
+        blank=True,
+        help_text="The vehicle type this plan is for.",
+    )
     qualifying_rides = models.PositiveSmallIntegerField(
         null=True, blank=True, help_text="Ride-share only: the platform ride is one of the first N completed rides."
     )
@@ -32,9 +42,14 @@ class SubscriptionPlan(TimeStampedModel):
         return self.name
 
     def clean(self):
-        if self.plan_type == PlanType.DAILY_FLAT and not self.duration_days:
-            raise ValidationError({"duration_days": "Daily plans need a duration in days."})
+        if self.plan_type == PlanType.DAILY_FLAT:
+            if not self.duration_hours:
+                raise ValidationError({"duration_hours": "Daily plans need a duration in hours."})
+            if not self.vehicle_type:
+                raise ValidationError({"vehicle_type": "Daily plans need a vehicle type."})
         if self.plan_type == PlanType.RIDE_SHARE:
+            if not self.vehicle_type:
+                raise ValidationError({"vehicle_type": "Ride-share plans need a vehicle type."})
             if not self.qualifying_rides or self.qualifying_rides < 2:
                 raise ValidationError({"qualifying_rides": "Ride-share plans need at least 2 qualifying rides."})
             if self.shortfall_fee is None:
@@ -61,6 +76,7 @@ class CaptainSubscription(TimeStampedModel):
     penalty_pending = models.BooleanField(
         default=False, help_text="Set after a shortfall day; cleared when the next day's first ride is taken."
     )
+    expiry_reminder_sent_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         indexes = [models.Index(fields=["captain", "status"])]

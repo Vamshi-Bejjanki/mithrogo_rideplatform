@@ -2,25 +2,62 @@
 
 {% block content %}
 <style>
-  .metric-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); margin: 12px 0 24px; }
-  .metric-card { background: var(--body-bg, #fff); border: 1px solid var(--hairline-color, #ddd); border-radius: 8px; padding: 14px 16px; }
-  .metric-card .value { font-size: 1.6rem; font-weight: 700; }
+  .metric-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); margin: 12px 0 20px; }
+  .metric-card { background: var(--body-bg, #fff); border: 1px solid var(--hairline-color, #ddd); border-radius: 8px; padding: 14px 16px; text-decoration: none; display: block; }
+  .metric-card .value { font-size: 1.6rem; font-weight: 700; color: var(--body-fg, #222); }
   .metric-card .label { color: var(--body-quiet-color, #666); font-size: .85rem; }
+  .metric-card.alert { border-color: #c62828; background: #fdecea; }
+  .metric-card.alert .value { color: #c62828; }
+  .sos-banner { background: #c62828; color: #fff; padding: 12px 16px; border-radius: 8px; margin: 12px 0; font-weight: 600; }
+  .sos-banner a { color: #fff; text-decoration: underline; }
+  .quick-links { margin: 0 0 20px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .chart { display: flex; align-items: flex-end; gap: 6px; height: 140px; padding: 8px 0; border-bottom: 1px solid var(--hairline-color, #ddd); }
+  .chart .col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+  .chart .bar { width: 70%; background: #0b8f5a; border-radius: 3px 3px 0 0; min-height: 2px; }
+  .chart .n { font-size: .7rem; color: var(--body-quiet-color, #666); }
+  .chart-labels { display: flex; gap: 6px; font-size: .7rem; color: var(--body-quiet-color, #666); }
+  .chart-labels span { flex: 1; text-align: center; }
 </style>
 
+{% if metrics.open_sos %}
+<div class="sos-banner">⚠ {{ metrics.open_sos }} unresolved SOS alert{{ metrics.open_sos|pluralize }} {{ metrics.open_sos|pluralize:"needs,need" }} attention.
+  <a href="{% url 'admin:support_sosalert_changelist' %}">Handle now</a></div>
+{% endif %}
+
 <div class="metric-grid">
-  <div class="metric-card"><div class="value">{{ metrics.total_customers }}</div><div class="label">Total customers</div></div>
-  <div class="metric-card"><div class="value">{{ metrics.total_captains }}</div><div class="label">Total captains</div></div>
-  <div class="metric-card"><div class="value">{{ metrics.online_captains }}</div><div class="label">Online captains</div></div>
-  <div class="metric-card"><div class="value">{{ metrics.pending_kyc }}</div><div class="label">Pending KYC</div></div>
-  <div class="metric-card"><div class="value">{{ metrics.active_rides }}</div><div class="label">Active rides (live)</div></div>
+  <a class="metric-card" href="{% url 'admin:users_user_changelist' %}?role__exact=CUSTOMER"><div class="value">{{ metrics.total_customers }}</div><div class="label">Total customers</div></a>
+  <a class="metric-card" href="{% url 'admin:captains_captainprofile_changelist' %}"><div class="value">{{ metrics.total_captains }}</div><div class="label">Total captains</div></a>
+  <a class="metric-card" href="{% url 'admin:captains_captainprofile_changelist' %}?online_status__exact=ONLINE"><div class="value">{{ metrics.online_captains }}</div><div class="label">Online captains</div></a>
+  <a class="metric-card" href="{% url 'admin:captains_captainprofile_changelist' %}?online_status__exact=BUSY"><div class="value">{{ metrics.busy_captains }}</div><div class="label">Captains on a ride</div></a>
+  <a class="metric-card" href="{% url 'admin:captains_captainprofile_changelist' %}?kyc_status__exact=UNDER_REVIEW"><div class="value">{{ metrics.pending_kyc }}</div><div class="label">Pending KYC</div></a>
+  <a class="metric-card" href="{% url 'admin:live_map' %}"><div class="value">{{ metrics.active_rides }}</div><div class="label">Active rides (live)</div></a>
   <div class="metric-card"><div class="value">{{ metrics.completed_today }}</div><div class="label">Completed today</div></div>
   <div class="metric-card"><div class="value">{{ metrics.cancelled_today }}</div><div class="label">Cancelled today</div></div>
   <div class="metric-card"><div class="value">₹{{ metrics.subscription_revenue }}</div><div class="label">Subscription revenue</div></div>
   <div class="metric-card"><div class="value">₹{{ metrics.ride_revenue }}</div><div class="label">Ride revenue</div></div>
-  <div class="metric-card"><div class="value">₹{{ metrics.pending_platform_dues }}</div><div class="label">Pending platform dues</div></div>
-  <div class="metric-card"><div class="value">{{ metrics.open_tickets }}</div><div class="label">Open complaints</div></div>
+  <div class="metric-card"><div class="value">₹{{ metrics.fee_revenue }}</div><div class="label">Cancellation fees</div></div>
+  <a class="metric-card" href="{% url 'admin:subscriptions_platformdue_changelist' %}?status__exact=PENDING"><div class="value">₹{{ metrics.pending_platform_dues }}</div><div class="label">Pending platform dues</div></a>
+  <a class="metric-card" href="{% url 'admin:support_supportticket_changelist' %}?status__exact=OPEN"><div class="value">{{ metrics.open_tickets }}</div><div class="label">Open complaints</div></a>
+  <a class="metric-card {% if metrics.open_sos %}alert{% endif %}" href="{% url 'admin:support_sosalert_changelist' %}"><div class="value">{{ metrics.open_sos }}</div><div class="label">Unresolved SOS alerts</div></a>
 </div>
+
+<div class="quick-links">
+  <a class="button" href="{% url 'admin:live_map' %}">Live map</a>
+  <a class="button" href="{% url 'admin:reports' %}">Reports and CSV</a>
+  <a class="button" href="{% url 'admin:broadcast' %}">Send announcement</a>
+  <a class="button" href="{% url 'admin:support_supportticket_changelist' %}?status__exact=OPEN">Open complaints</a>
+  <a class="button" href="{% url 'admin:captains_captainprofile_changelist' %}?kyc_status__exact=UNDER_REVIEW">KYC to review</a>
+</div>
+
+{% if chart %}
+<div class="module" style="padding: 12px 16px; margin-bottom: 20px;">
+  <h2 style="margin: -12px -16px 12px; padding: 8px 16px;">Completed rides, last 14 days</h2>
+  <div class="chart">
+    {% for day in chart %}<div class="col" title="{{ day.date }}: {{ day.rides }} rides, ₹{{ day.fares }}"><span class="n">{{ day.rides }}</span><div class="bar" style="height: {{ day.rides_pct }}%"></div></div>{% endfor %}
+  </div>
+  <div class="chart-labels">{% for day in chart %}<span>{{ day.date }}</span>{% endfor %}</div>
+</div>
+{% endif %}
 
 <p><a class="button" href="/admin/rides/ride/?live=active">View live rides</a>
    <a class="button" href="/admin/support/supportticket/?status__exact=OPEN">Open complaints</a>

@@ -1,3 +1,4 @@
+import uuid
 from datetime import timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo
@@ -79,10 +80,20 @@ def active_subscription(captain):
     if sub is None:
         return None
     if sub.plan.plan_type == PlanType.DAILY_FLAT and sub.expires_at and sub.expires_at <= timezone.now():
-        sub.status = SubStatus.EXPIRED
-        sub.save(update_fields=["status", "updated_at"])
+        _expire(sub)
         return None
     return sub
+
+
+def _expire(sub):
+    """Mark a daily plan expired and tell the captain. Only the call that flips the status notifies."""
+    updated = CaptainSubscription.objects.filter(pk=sub.pk, status=SubStatus.ACTIVE).update(
+        status=SubStatus.EXPIRED, updated_at=timezone.now()
+    )
+    sub.status = SubStatus.EXPIRED
+    if updated:
+        notify(sub.captain.user, "SUBSCRIPTION_EXPIRED", "Plan expired", "Renew your daily plan to go online.")
+    return bool(updated)
 
 
 def plan_block_reasons(captain):
@@ -105,20 +116,64 @@ def plan_block_reasons(captain):
 
 # ---------- plans and purchase ----------
 
-def list_plans():
-    return SubscriptionPlan.objects.filter(is_active=True)
+def list_plans(vehicle_types):
+    """Active plans for the given vehicle types only, so a Bike captain never sees Auto plans."""
+    return SubscriptionPlan.objects.filter(is_active=True, vehicle_type__in=vehicle_types)
 
 
-def create_daily_subscription_payment(captain, plan_code):
-    """Start buying a daily plan. The subscription becomes ACTIVE only when the payment webhook confirms it."""
+def _check_daily_purchase(captain, plan_code):
+    """Every rule a daily plan purchase must pass, whichever way it is paid for."""
     plan = _get_plan(plan_code, PlanType.DAILY_FLAT)
     if _ride_in_progress(captain):
         raise Conflict("Finish your current ride before changing plans.", code="ride_in_progress")
+    if not captain.vehicles.filter(vehicle_type=plan.vehicle_type, is_verified=True).exists():
+        raise DomainError(
+            f"You need a verified {plan.get_vehicle_type_display()} to buy this plan.", code="no_verified_vehicle"
+        )
     current = active_subscription(captain)
     if current is not None and current.plan.plan_type == PlanType.DAILY_FLAT:
         raise Conflict(
             f"Your daily plan is active until {current.expires_at:%d %b %H:%M}.", code="plan_already_active"
         )
+    return plan
+
+
+def pay_daily_plan_from_wallet(captain, plan_code):
+    """Buy a daily plan from the captain's wallet. Activates at once, since the money is already held."""
+    from apps.wallets import services as wallet_services
+    from apps.wallets.models import WalletTxnKind
+
+    plan = _check_daily_purchase(captain, plan_code)
+    with transaction.atomic():
+        CaptainSubscription.objects.filter(captain=captain, status=SubStatus.PENDING).update(
+            status=SubStatus.CANCELLED
+        )
+        sub = CaptainSubscription.objects.create(captain=captain, plan=plan, status=SubStatus.PENDING)
+        wallet_services.debit(captain, plan.amount, WalletTxnKind.PLAN_PURCHASE, reference=f"sub:{sub.id}")
+        activate_from_payment(sub, None)
+    return sub
+
+
+def pay_dues_from_wallet(captain):
+    """Settle every pending platform due from the wallet in one step. Returns the amount paid."""
+    from apps.wallets import services as wallet_services
+    from apps.wallets.models import WalletTxnKind
+
+    with transaction.atomic():
+        dues = list(PlatformDue.objects.select_for_update().filter(captain=captain, status=DueStatus.PENDING))
+        total = sum((due.amount for due in dues), Decimal("0"))
+        if total <= 0:
+            raise DomainError("You have no pending dues.", code="no_dues")
+        wallet_services.debit(captain, total, WalletTxnKind.DUES_SETTLEMENT, reference=f"dues:{uuid.uuid4()}")
+        PlatformDue.objects.filter(id__in=[due.id for due in dues]).update(
+            status=DueStatus.SETTLED, settled_at=timezone.now()
+        )
+    return total
+
+
+def create_daily_subscription_payment(captain, plan_code):
+    """Start buying a daily plan. The subscription becomes ACTIVE only when the payment webhook confirms it."""
+    plan = _check_daily_purchase(captain, plan_code)
     with transaction.atomic():
         CaptainSubscription.objects.filter(captain=captain, status=SubStatus.PENDING).update(
             status=SubStatus.CANCELLED
@@ -140,6 +195,10 @@ def switch_to_ride_share(captain, plan_code):
     plan = _get_plan(plan_code, PlanType.RIDE_SHARE)
     if _ride_in_progress(captain):
         raise Conflict("Finish your current ride before changing plans.", code="ride_in_progress")
+    if not captain.vehicles.filter(vehicle_type=plan.vehicle_type, is_verified=True).exists():
+        raise DomainError(
+            f"You need a verified {plan.get_vehicle_type_display()} to choose this plan.", code="no_verified_vehicle"
+        )
     close_stale_days(captain)
     current = active_subscription(captain)
     if current is not None and current.plan_id == plan.id:
@@ -178,7 +237,7 @@ def activate_from_payment(subscription, payment):
                 status=SubStatus.CANCELLED
             )
             sub.start_at = now
-            sub.expires_at = now + timedelta(days=sub.plan.duration_days)
+            sub.expires_at = now + timedelta(hours=sub.plan.duration_hours)
         sub.status = SubStatus.ACTIVE
         sub.save(update_fields=["status", "start_at", "expires_at", "updated_at"])
     notify(sub.captain.user, "PAYMENT_SUCCESS", "Plan active", f"Your {sub.plan.name} plan is active.")
@@ -218,9 +277,36 @@ def expire_subscriptions():
     ).select_related("captain__user")
     count = 0
     for sub in expired:
-        sub.status = SubStatus.EXPIRED
-        sub.save(update_fields=["status", "updated_at"])
-        notify(sub.captain.user, "SUBSCRIPTION_EXPIRED", "Plan expired", "Renew your daily plan to go online.")
+        count += _expire(sub)
+    return count
+
+
+def remind_expiring_subscriptions():
+    """Warn captains shortly before a daily plan runs out, once per plan. Run from run_periodic_jobs."""
+    now = timezone.now()
+    window = timedelta(minutes=PlatformConfig.load().plan_expiry_reminder_minutes)
+    due = CaptainSubscription.objects.filter(
+        status=SubStatus.ACTIVE,
+        plan__plan_type=PlanType.DAILY_FLAT,
+        expires_at__gt=now,
+        expires_at__lte=now + window,
+        expiry_reminder_sent_at__isnull=True,
+    ).select_related("captain__user")
+    count = 0
+    for sub in due:
+        claimed = CaptainSubscription.objects.filter(pk=sub.pk, expiry_reminder_sent_at__isnull=True).update(
+            expiry_reminder_sent_at=now
+        )
+        if not claimed:
+            continue
+        minutes = max(1, int((sub.expires_at - now).total_seconds() // 60))
+        notify(
+            sub.captain.user,
+            "SUBSCRIPTION_EXPIRING",
+            "Plan ending soon",
+            f"Your daily plan ends in {minutes} minutes. Renew to keep taking rides.",
+            {"subscription_id": sub.pk},
+        )
         count += 1
     return count
 
@@ -368,3 +454,23 @@ def todays_summary(captain):
         "platform_ride_taken": bool(day and day.platform_ride_id),
         "surrendered": bool(day and day.surrendered_ride_id),
     }
+
+
+# ---------- admin actions on dues ----------
+
+def waive_due(due, actor=None):
+    if due.status != DueStatus.PENDING:
+        raise Conflict("Only pending dues can be waived.", code="not_pending")
+    due.status = DueStatus.WAIVED
+    due.save(update_fields=["status", "updated_at"])
+    return due
+
+
+def settle_due_offline(due, actor=None):
+    """Admin confirms the captain paid in cash or by bank transfer, outside the gateway."""
+    if due.status != DueStatus.PENDING:
+        raise Conflict("Only pending dues can be settled.", code="not_pending")
+    due.status = DueStatus.SETTLED
+    due.settled_at = timezone.now()
+    due.save(update_fields=["status", "settled_at", "updated_at"])
+    return due

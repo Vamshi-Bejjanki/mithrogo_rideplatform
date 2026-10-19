@@ -8,6 +8,8 @@ class PaymentType(models.TextChoices):
     RIDE_PAYMENT = "RIDE_PAYMENT", "Ride payment"
     CAPTAIN_SUBSCRIPTION = "CAPTAIN_SUBSCRIPTION", "Captain subscription"
     DUES_SETTLEMENT = "DUES_SETTLEMENT", "Platform dues settlement"
+    WALLET_TOP_UP = "WALLET_TOP_UP", "Captain wallet top-up"
+    CANCELLATION_FEE = "CANCELLATION_FEE", "Rider cancellation or no-show fee"
 
 
 class PaymentStatus(models.TextChoices):

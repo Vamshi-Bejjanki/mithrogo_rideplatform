@@ -70,8 +70,11 @@ INSTALLED_APPS = [
     "apps.subscriptions",
     "apps.rides",
     "apps.payments",
+    "apps.wallets",
     "apps.notifications",
     "apps.support",
+    "apps.promotions",
+    "apps.backoffice",
 ]
 
 MIDDLEWARE = [
@@ -154,6 +157,8 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "otp": os.environ.get("OTP_SEND_THROTTLE", "10/min"),
         "otp_verify": os.environ.get("OTP_VERIFY_THROTTLE", "30/min"),
+        "admin_login": os.environ.get("ADMIN_LOGIN_THROTTLE", "10/min"),
+        "sos": os.environ.get("SOS_THROTTLE", "5/min"),
     },
     "DEFAULT_PAGINATION_CLASS": None,
 }

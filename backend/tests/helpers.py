@@ -55,11 +55,13 @@ def make_captain(
         is_verified=verified,
         verified_at=timezone.now() if verified else None,
     )
+    if verified:
+        captain_services.select_vehicle_for_today(profile, vehicle_type)
     if plan == "daily":
-        sub, payment = subscription_services.create_daily_subscription_payment(profile, "DAILY_30")
+        sub, payment = subscription_services.create_daily_subscription_payment(profile, f"DAILY_{vehicle_type}")
         payment_services.mark_success(payment.provider_order_id, f"pay_{payment.id.hex[:12]}", payment.amount)
     elif plan == "ride_share":
-        subscription_services.switch_to_ride_share(profile, "RIDE_SHARE_1_IN_5")
+        subscription_services.switch_to_ride_share(profile, f"RIDE_SHARE_{vehicle_type}")
     if location is not None:
         update_location(profile, location[0], location[1])
     if online:

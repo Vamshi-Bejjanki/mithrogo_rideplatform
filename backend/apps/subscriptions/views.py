@@ -3,7 +3,7 @@ from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.captains.services import describe_reasons, ensure_profile
+from apps.captains.services import describe_reasons, ensure_profile, todays_vehicle_type
 from apps.payments.models import Payment
 from apps.payments.serializers import PaymentSerializer
 from apps.subscriptions import services
@@ -30,7 +30,12 @@ class PlanListView(CaptainMixin, generics.ListAPIView):
     serializer_class = SubscriptionPlanSerializer
 
     def get_queryset(self):
-        return services.list_plans()
+        captain = self.captain
+        chosen = todays_vehicle_type(captain)
+        if chosen:
+            return services.list_plans([chosen])
+        verified = captain.vehicles.filter(is_verified=True).values_list("vehicle_type", flat=True)
+        return services.list_plans(list(verified))
 
 
 class SubscriptionSummaryView(CaptainMixin, APIView):

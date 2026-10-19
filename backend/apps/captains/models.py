@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 
+from apps.vehicles.models import VehicleType
 from core.models import TimeStampedModel
 
 
@@ -26,6 +27,7 @@ class CaptainProfile(TimeStampedModel):
     license_number = models.CharField(max_length=40, blank=True)
     license_expiry = models.DateField(null=True, blank=True)
     kyc_status = models.CharField(max_length=20, choices=KycStatus.choices, default=KycStatus.PENDING, db_index=True)
+    kyc_rejection_reason = models.CharField(max_length=300, blank=True, help_text="Shown to the captain.")
     online_status = models.CharField(
         max_length=10, choices=OnlineStatus.choices, default=OnlineStatus.OFFLINE, db_index=True
     )
@@ -34,6 +36,11 @@ class CaptainProfile(TimeStampedModel):
     last_location_at = models.DateTimeField(null=True, blank=True)
     rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
     total_rides = models.PositiveIntegerField(default=0)
+    cancelled_rides = models.PositiveIntegerField(default=0, help_text="Rides this captain cancelled after accepting.")
+    day_vehicle_type = models.CharField(
+        max_length=10, choices=VehicleType.choices, null=True, blank=True, help_text="Vehicle chosen for the day."
+    )
+    day_vehicle_date = models.DateField(null=True, blank=True, help_text="Service day the vehicle was chosen for.")
 
     def __str__(self):
         return f"Captain {self.user.phone}"

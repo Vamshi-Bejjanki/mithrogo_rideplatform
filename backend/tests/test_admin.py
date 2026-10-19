@@ -114,6 +114,18 @@ def test_platform_config_change_is_saved_and_audited(staff):
             "min_trip_km": "0.50",
             "unpaid_dues_limit": "500.00",
             "service_timezone": "Asia/Kolkata",
+            "plan_expiry_reminder_minutes": "60",
+            "require_start_pin": "on",
+            "start_pin_max_attempts": "5",
+            "share_link_grace_minutes": "30",
+            "customer_cancel_fee": "0",
+            "cancel_free_window_seconds": "120",
+            "customer_no_show_fee": "0",
+            "no_show_wait_minutes": "5",
+            "block_booking_on_unpaid_fees": "on",
+            "referral_referee_reward": "0",
+            "referral_referrer_reward": "0",
+            "referral_reward_valid_days": "30",
         },
     )
 

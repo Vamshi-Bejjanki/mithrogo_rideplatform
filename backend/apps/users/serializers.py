@@ -23,6 +23,21 @@ class VerifyOtpSerializer(serializers.Serializer):
     role = serializers.ChoiceField(choices=[Role.CUSTOMER, Role.CAPTAIN])
 
 
+class DeleteAccountSerializer(serializers.Serializer):
+    confirm = serializers.BooleanField()
+    reason = serializers.CharField(max_length=200, required=False, allow_blank=True, default="")
+
+    def validate_confirm(self, value):
+        if not value:
+            raise serializers.ValidationError("Set confirm to true to delete your account.")
+        return value
+
+
+class AdminLoginSerializer(serializers.Serializer):
+    phone = PhoneField(max_length=20)
+    password = serializers.CharField(max_length=128, trim_whitespace=False)
+
+
 class LogoutSerializer(serializers.Serializer):
     refresh = serializers.CharField()
 

@@ -21,7 +21,7 @@ def dashboard_metrics():
     from apps.payments.models import Payment, PaymentStatus, PaymentType
     from apps.rides.models import ACTIVE_STATUSES, Ride, RideStatus
     from apps.subscriptions.models import DueStatus, PlatformDue
-    from apps.support.models import SupportTicket, TicketStatus
+    from apps.support.models import SosAlert, SosStatus, SupportTicket, TicketStatus
     from apps.users.models import Role, User
 
     now = timezone.now()
@@ -51,4 +51,7 @@ def dashboard_metrics():
         "open_tickets": SupportTicket.objects.filter(
             Q(status=TicketStatus.OPEN) | Q(status=TicketStatus.IN_PROGRESS)
         ).count(),
+        "open_sos": SosAlert.objects.exclude(status=SosStatus.RESOLVED).count(),
+        "fee_revenue": revenue(PaymentType.CANCELLATION_FEE),
+        "busy_captains": CaptainProfile.objects.filter(online_status=OnlineStatus.BUSY).count(),
     }

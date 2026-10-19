@@ -11,6 +11,9 @@ REASON_MESSAGES = {
     "account_suspended": "Your account is suspended.",
     "kyc_not_approved": "Your documents are not approved yet.",
     "no_verified_vehicle": "You need a verified vehicle.",
+    "vehicle_not_selected": "Choose the vehicle you are working with today to go online.",
+    "vehicle_mismatch": "This ride needs a different vehicle than the one you chose today.",
+    "plan_vehicle_mismatch": "Your plan is for a different vehicle. Switch to a plan for today's vehicle.",
     "no_active_plan": "Choose a plan to start taking rides.",
     "plan_expired": "Your daily plan has expired. Renew to go online.",
     "shortfall_fee_unpaid": "Pay your shortfall fee to go online.",
@@ -23,24 +26,65 @@ def ensure_profile(user):
     return profile
 
 
+def todays_vehicle_type(captain):
+    """The vehicle the captain chose for today's service day, or None if they have not chosen yet."""
+    from apps.subscriptions.services import service_today
+
+    if captain.day_vehicle_date == service_today():
+        return captain.day_vehicle_type
+    return None
+
+
+@transaction.atomic
+def select_vehicle_for_today(captain, vehicle_type):
+    """Choose which vehicle the captain works with today. Required before going online or taking rides.
+
+    Allowed while online so a captain can choose right after midnight; refused only mid-ride.
+    """
+    from apps.subscriptions.services import service_today
+
+    locked = CaptainProfile.objects.select_for_update().get(pk=captain.pk)
+    if locked.online_status == OnlineStatus.BUSY:
+        raise Conflict("Finish your current ride before changing vehicle.", code="captain_busy")
+    if not locked.vehicles.filter(vehicle_type=vehicle_type, is_verified=True).exists():
+        raise DomainError("You need a verified vehicle of this type.", code="no_verified_vehicle")
+    locked.day_vehicle_type = vehicle_type
+    locked.day_vehicle_date = service_today()
+    locked.save(update_fields=["day_vehicle_type", "day_vehicle_date", "updated_at"])
+    captain.day_vehicle_type = locked.day_vehicle_type
+    captain.day_vehicle_date = locked.day_vehicle_date
+    return captain
+
+
 def eligibility_reasons(captain, vehicle_type=None):
     """Every reason this captain cannot take rides right now (empty list = eligible).
 
     Used by go-online, matching, and accept. The single source of truth for eligibility.
+    `vehicle_type` is the ride's type when checking a ride; otherwise today's chosen vehicle is used.
     """
-    from apps.subscriptions.services import plan_block_reasons
+    from apps.subscriptions.services import active_subscription, plan_block_reasons
 
     reasons = []
     if not captain.user.is_active:
         reasons.append("account_suspended")
     if captain.kyc_status != KycStatus.APPROVED:
         reasons.append("kyc_not_approved")
+
+    today_type = todays_vehicle_type(captain)
     vehicles = captain.vehicles.filter(is_verified=True)
-    if vehicle_type:
-        vehicles = vehicles.filter(vehicle_type=vehicle_type)
+    if vehicle_type or today_type:
+        vehicles = vehicles.filter(vehicle_type=vehicle_type or today_type)
     if not vehicles.exists():
         reasons.append("no_verified_vehicle")
     reasons.extend(plan_block_reasons(captain))
+
+    sub = active_subscription(captain)
+    if sub is not None and today_type and sub.plan.vehicle_type not in (None, today_type):
+        reasons.append("plan_vehicle_mismatch")
+    if today_type is None:
+        reasons.append("vehicle_not_selected")
+    elif vehicle_type and vehicle_type != today_type:
+        reasons.append("vehicle_mismatch")
     return reasons
 
 
@@ -101,18 +145,21 @@ def approve_kyc(captain, actor=None):
     if captain.kyc_status == KycStatus.SUSPENDED:
         raise Conflict("Reactivate the captain before approving.", code="captain_suspended")
     captain.kyc_status = KycStatus.APPROVED
-    captain.save(update_fields=["kyc_status", "updated_at"])
+    captain.kyc_rejection_reason = ""
+    captain.save(update_fields=["kyc_status", "kyc_rejection_reason", "updated_at"])
     notify(captain.user, "KYC_APPROVED", "Documents approved", "You can now choose a plan and go online.")
     return captain
 
 
-def reject_kyc(captain, actor=None):
+def reject_kyc(captain, actor=None, reason=""):
     if captain.online_status == OnlineStatus.BUSY:
         raise Conflict("The captain is on a ride.", code="captain_busy")
     captain.kyc_status = KycStatus.REJECTED
     captain.online_status = OnlineStatus.OFFLINE
-    captain.save(update_fields=["kyc_status", "online_status", "updated_at"])
-    notify(captain.user, "KYC_REJECTED", "Documents need changes", "Please review your documents and resubmit.")
+    captain.kyc_rejection_reason = (reason or "")[:300]
+    captain.save(update_fields=["kyc_status", "online_status", "kyc_rejection_reason", "updated_at"])
+    message = f"Please fix this and resubmit: {reason}" if reason else "Please review your documents and resubmit."
+    notify(captain.user, "KYC_REJECTED", "Documents need changes", message)
     return captain
 
 

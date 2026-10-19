@@ -44,6 +44,74 @@ class PlatformConfig(TimeStampedModel):
         help_text="Defines the business day for ride-share counting.",
     )
 
+    # Ride safety
+    require_start_pin = models.BooleanField(
+        "require ride start PIN",
+        default=True,
+        help_text="The captain must enter the rider's 4-digit PIN to start the ride.",
+    )
+    start_pin_max_attempts = models.PositiveSmallIntegerField("wrong PIN attempts allowed", default=5)
+
+    # Cancellations
+    customer_cancel_fee = models.DecimalField(
+        "customer cancellation fee (₹)",
+        max_digits=8,
+        decimal_places=2,
+        default=0,
+        help_text="Charged when the rider cancels after the free window. 0 turns the fee off.",
+    )
+    cancel_free_window_seconds = models.PositiveIntegerField(
+        "free cancellation window (seconds)",
+        default=120,
+        help_text="Time after a captain accepts during which the rider can cancel for free.",
+    )
+    customer_no_show_fee = models.DecimalField(
+        "rider no-show fee (₹)",
+        max_digits=8,
+        decimal_places=2,
+        default=0,
+        help_text="Charged when the captain cancels because the rider never came. 0 turns the fee off.",
+    )
+    no_show_wait_minutes = models.PositiveIntegerField(
+        "no-show wait (minutes)",
+        default=5,
+        help_text="How long a captain must wait at pickup before cancelling for a no-show.",
+    )
+    block_booking_on_unpaid_fees = models.BooleanField(
+        "block booking while fees are unpaid",
+        default=True,
+        help_text="Riders must pay outstanding cancellation fees before booking again.",
+    )
+
+    # Referrals
+    referral_referee_reward = models.DecimalField(
+        "referral reward for the new rider (₹)",
+        max_digits=8,
+        decimal_places=2,
+        default=0,
+        help_text="Flat discount given to a rider who applies a referral code. 0 turns referrals off.",
+    )
+    referral_referrer_reward = models.DecimalField(
+        "referral reward for the referrer (₹)",
+        max_digits=8,
+        decimal_places=2,
+        default=0,
+        help_text="Flat discount given to the referrer after the new rider completes a first ride.",
+    )
+    referral_reward_valid_days = models.PositiveIntegerField("referral reward validity (days)", default=30)
+
+    # Notifications and sharing
+    plan_expiry_reminder_minutes = models.PositiveIntegerField(
+        "plan expiry reminder (minutes before)",
+        default=60,
+        help_text="Captains are reminded this long before a daily plan runs out.",
+    )
+    share_link_grace_minutes = models.PositiveIntegerField(
+        "trip share link grace (minutes)",
+        default=30,
+        help_text="A shared trip link keeps working this long after the ride ends.",
+    )
+
     class Meta:
         verbose_name = "platform configuration"
         verbose_name_plural = "platform configuration"

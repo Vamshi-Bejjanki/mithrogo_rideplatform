@@ -11,7 +11,7 @@ def test_periodic_job_expires_a_daily_plan_and_notifies_the_captain(clock):
     captain = make_captain(location=None, online=False)
     sub = CaptainSubscription.objects.get(captain=captain, status=SubStatus.ACTIVE)
 
-    clock.advance(days=1, minutes=1)
+    clock.advance(hours=12, minutes=1)
     call_command("run_periodic_jobs")
 
     sub.refresh_from_db()
@@ -22,7 +22,7 @@ def test_periodic_job_expires_a_daily_plan_and_notifies_the_captain(clock):
 @pytest.mark.django_db
 def test_periodic_job_is_safe_to_run_repeatedly(clock):
     make_captain(location=None, online=False)
-    clock.advance(days=1, minutes=1)
+    clock.advance(hours=12, minutes=1)
 
     call_command("run_periodic_jobs")
     call_command("run_periodic_jobs")

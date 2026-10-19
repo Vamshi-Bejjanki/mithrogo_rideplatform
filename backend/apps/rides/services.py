@@ -1,3 +1,5 @@
+import secrets
+from datetime import timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.db import IntegrityError, transaction
@@ -6,17 +8,23 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
-from core.exceptions import Conflict, Forbidden
+from core.exceptions import Conflict, DomainError, Forbidden, RateLimited
 from core.metrics import service_day_start
+from core.models import PlatformConfig
 from apps.captains.models import CaptainProfile, OnlineStatus
 from apps.captains.services import describe_reasons, eligibility_reasons, update_location
 from apps.notifications.services import notify
 from apps.payments.models import Payment, PaymentStatus, PaymentType
 from apps.payments.services import create_payment
 from apps.rides import matching, pricing
+from apps.promotions import services as promo_services
 from apps.rides.models import (
     ACTIVE_STATUSES,
     IN_PROGRESS_STATUSES,
+    CancelledBy,
+    CaptainCancelReason,
+    CustomerCancelReason,
+    FeeStatus,
     OfferStatus,
     PaymentMethod,
     Rating,
@@ -25,6 +33,7 @@ from apps.rides.models import (
     RideEvent,
     RideLocation,
     RideOffer,
+    RideShareLink,
     RideStatus,
 )
 from apps.rides.state import transition
@@ -32,11 +41,13 @@ from apps.subscriptions import services as subscription_services
 from apps.subscriptions.models import DueStatus, PlatformDue
 
 CANCELLABLE = {RideStatus.REQUESTED, RideStatus.SEARCHING, RideStatus.ACCEPTED, RideStatus.CAPTAIN_ARRIVED}
+# The rider sees the start PIN from booking until the trip starts.
+PIN_VISIBLE_STATUSES = {RideStatus.SEARCHING, RideStatus.ACCEPTED, RideStatus.CAPTAIN_ARRIVED}
 
 
 # ---------- customer side ----------
 
-def estimate(data):
+def estimate(data, customer=None):
     quote = pricing.quote(
         data["vehicle_type"],
         data["pickup_latitude"],
@@ -44,14 +55,30 @@ def estimate(data):
         data["drop_latitude"],
         data["drop_longitude"],
     )
+    discount = Decimal("0")
+    if data.get("promo_code") and customer is not None:
+        _, discount = promo_services.validate(customer, data["promo_code"], quote.fare)
     # Money is sent as strings (like the ride serializers), so clients never round it through floats.
     return {
         "vehicle_type": quote.vehicle_type,
         "distance_km": str(quote.distance_km),
         "duration_minutes": quote.duration_minutes,
         "fare": str(quote.fare),
+        "discount": str(discount),
+        "payable_fare": str(quote.fare - discount),
         "currency": "INR",
     }
+
+
+def outstanding_fees(customer):
+    """Cancelled rides whose fee the rider still owes."""
+    return Ride.objects.filter(
+        customer=customer, status=RideStatus.CANCELLED, cancellation_fee_status=FeeStatus.UNPAID
+    )
+
+
+def _new_start_pin():
+    return f"{secrets.randbelow(10000):04d}"
 
 
 def create_ride(customer, data, idempotency_key=None):
@@ -61,6 +88,8 @@ def create_ride(customer, data, idempotency_key=None):
             return existing
     if Ride.objects.filter(customer=customer, status__in=ACTIVE_STATUSES).exists():
         raise Conflict("You already have an active ride.", code="active_ride_exists")
+    if PlatformConfig.load().block_booking_on_unpaid_fees and outstanding_fees(customer).exists():
+        raise Conflict("Please pay your pending cancellation fee to book again.", code="unpaid_cancellation_fee")
 
     quote = pricing.quote(
         data["vehicle_type"],
@@ -69,6 +98,9 @@ def create_ride(customer, data, idempotency_key=None):
         data["drop_latitude"],
         data["drop_longitude"],
     )
+    promo, discount = None, Decimal("0")
+    if data.get("promo_code"):
+        promo, discount = promo_services.validate(customer, data["promo_code"], quote.fare)
     try:
         with transaction.atomic():
             ride = Ride.objects.create(
@@ -86,7 +118,12 @@ def create_ride(customer, data, idempotency_key=None):
                 payment_method=data.get("payment_method", PaymentMethod.ONLINE),
                 status=RideStatus.REQUESTED,
                 idempotency_key=idempotency_key,
+                start_pin=_new_start_pin(),
+                promo_code=promo.code if promo else "",
+                discount_amount=discount,
             )
+            if promo is not None:
+                promo_services.reserve(customer, promo, ride, discount)
             RideEvent.objects.create(ride=ride, from_status="", to_status=RideStatus.REQUESTED, actor=customer)
             transition(ride, RideStatus.SEARCHING, actor=customer)
     except IntegrityError:
@@ -106,8 +143,19 @@ def get_customer_ride(customer, ride_id):
     return ride
 
 
-def cancel_ride(ride, actor=None, reason="CANCELLED_BY_CUSTOMER"):
-    """Cancel from any pre-start state. Frees the captain, releases any surrender, and notifies the other side."""
+def _free_captain(captain_id):
+    """Put a captain back to ONLINE (or OFFLINE if no longer eligible) after leaving a ride."""
+    captain = CaptainProfile.objects.select_for_update().get(pk=captain_id)
+    captain.online_status = OnlineStatus.OFFLINE if eligibility_reasons(captain) else OnlineStatus.ONLINE
+    captain.save(update_fields=["online_status", "updated_at"])
+    return captain
+
+
+def cancel_ride(ride, actor=None, reason="CANCELLED_BY_CUSTOMER", cancelled_by=None, note="", fee=Decimal("0")):
+    """Cancel from any pre-start state. Frees the captain, releases any surrender or promo, records any fee,
+    and notifies the other side."""
+    if cancelled_by is None:
+        cancelled_by = CancelledBy.SYSTEM if actor is None else CancelledBy.CUSTOMER
     with transaction.atomic():
         ride = Ride.objects.select_for_update().get(pk=ride.pk)
         if ride.status not in CANCELLABLE:
@@ -115,23 +163,66 @@ def cancel_ride(ride, actor=None, reason="CANCELLED_BY_CUSTOMER"):
         engaged = ride.status in IN_PROGRESS_STATUSES
         transition(ride, RideStatus.CANCELLED, actor=actor, note=reason)
         ride.cancellation_reason = reason
-        ride.save(update_fields=["cancellation_reason", "updated_at"])
+        ride.cancelled_by = cancelled_by
+        ride.cancellation_note = (note or "")[:300]
+        ride.cancellation_fee = fee
+        ride.cancellation_fee_status = FeeStatus.UNPAID if fee > 0 else FeeStatus.NONE
+        ride.save(update_fields=[
+            "cancellation_reason", "cancelled_by", "cancellation_note", "cancellation_fee",
+            "cancellation_fee_status", "updated_at",
+        ])
         RideOffer.objects.filter(ride=ride, status=OfferStatus.PENDING).update(
             status=OfferStatus.CANCELLED, responded_at=timezone.now()
         )
         subscription_services.release_surrender(ride)
+        promo_services.release(ride)
 
+        data = {"ride_id": str(ride.id)}
         if ride.captain_id:
-            captain = CaptainProfile.objects.select_for_update().get(pk=ride.captain_id)
-            if engaged:
-                captain.online_status = (
-                    OnlineStatus.OFFLINE if eligibility_reasons(captain) else OnlineStatus.ONLINE
-                )
-                captain.save(update_fields=["online_status", "updated_at"])
-            notify(captain.user, "RIDE_CANCELLED", "Ride cancelled", f"Reason: {reason}", {"ride_id": str(ride.id)})
-        if actor is None or actor.pk == ride.customer_id:
-            notify(ride.customer, "RIDE_CANCELLED", "Ride cancelled", "Your ride was cancelled.", {"ride_id": str(ride.id)})
+            captain = _free_captain(ride.captain_id) if engaged else ride.captain
+            if cancelled_by != CancelledBy.CAPTAIN:
+                notify(captain.user, "RIDE_CANCELLED", "Ride cancelled", f"Reason: {reason}", data)
+        message = f"Your ride was cancelled. A fee of ₹{fee} applies." if fee > 0 else "Your ride was cancelled."
+        notify(ride.customer, "RIDE_CANCELLED", "Ride cancelled", message, data)
     return ride
+
+
+def customer_cancel_fee(ride, reason, now=None):
+    """The fee for a rider cancelling now: only after a captain accepted, past the free window,
+    and never when the captain caused it or for safety."""
+    config = PlatformConfig.load()
+    if config.customer_cancel_fee <= 0 or ride.accepted_at is None:
+        return Decimal("0")
+    if ride.status not in IN_PROGRESS_STATUSES:
+        return Decimal("0")
+    if reason in (CustomerCancelReason.CAPTAIN_ASKED, CustomerCancelReason.SAFETY):
+        return Decimal("0")
+    now = now or timezone.now()
+    if now - ride.accepted_at <= timedelta(seconds=config.cancel_free_window_seconds):
+        return Decimal("0")
+    return config.customer_cancel_fee
+
+
+def customer_cancel(customer, ride_id, reason=CustomerCancelReason.OTHER, note=""):
+    ride = get_object_or_404(Ride, pk=ride_id, customer=customer)
+    fee = customer_cancel_fee(ride, reason)
+    return cancel_ride(ride, actor=customer, reason=reason, cancelled_by=CancelledBy.CUSTOMER, note=note, fee=fee)
+
+
+def cancel_preview(customer, ride_id):
+    """What cancelling right now would cost, so the app can warn before the rider confirms."""
+    ride = get_object_or_404(Ride, pk=ride_id, customer=customer)
+    config = PlatformConfig.load()
+    fee = customer_cancel_fee(ride, CustomerCancelReason.OTHER)
+    free_until = None
+    if ride.accepted_at and config.customer_cancel_fee > 0 and ride.status in IN_PROGRESS_STATUSES:
+        free_until = ride.accepted_at + timedelta(seconds=config.cancel_free_window_seconds)
+    return {
+        "can_cancel": ride.status in CANCELLABLE,
+        "fee": str(fee),
+        "free_until": free_until,
+        "reasons": [{"code": value, "label": label} for value, label in CustomerCancelReason.choices],
+    }
 
 
 def request_online_payment(customer, ride_id):
@@ -151,7 +242,49 @@ def request_online_payment(customer, ride_id):
     ).first()
     if pending is not None:
         return pending
-    return create_payment(customer, PaymentType.RIDE_PAYMENT, ride.final_fare, {"ride_id": str(ride.id)})
+    return create_payment(customer, PaymentType.RIDE_PAYMENT, ride.payable_fare, {"ride_id": str(ride.id)})
+
+
+def request_fee_payment(customer, ride_id):
+    """Pay the cancellation or no-show fee of a cancelled ride online."""
+    ride = get_object_or_404(Ride, pk=ride_id, customer=customer)
+    if ride.cancellation_fee_status != FeeStatus.UNPAID:
+        raise Conflict("There is no fee to pay for this ride.", code="no_fee_due")
+    pending = Payment.objects.filter(
+        user=customer,
+        payment_type=PaymentType.CANCELLATION_FEE,
+        status=PaymentStatus.PENDING,
+        metadata__ride_id=str(ride.id),
+    ).first()
+    if pending is not None:
+        return pending
+    return create_payment(customer, PaymentType.CANCELLATION_FEE, ride.cancellation_fee, {"ride_id": str(ride.id)})
+
+
+def on_fee_paid(payment):
+    """Webhook handler. The fee compensates the captain who was cancelled on, through their wallet."""
+    ride = Ride.objects.select_for_update().get(pk=payment.metadata["ride_id"])
+    if ride.cancellation_fee_status != FeeStatus.UNPAID:
+        return
+    ride.cancellation_fee_status = FeeStatus.PAID
+    ride.save(update_fields=["cancellation_fee_status", "updated_at"])
+    if ride.captain_id:
+        from apps.wallets import services as wallet_services
+        from apps.wallets.models import WalletTxnKind
+
+        wallet_services.credit(ride.captain, payment.amount, WalletTxnKind.CANCELLATION_FEE, f"ride:{ride.id}")
+
+
+def waive_fee(ride, actor=None):
+    with transaction.atomic():
+        ride = Ride.objects.select_for_update().get(pk=ride.pk)
+        if ride.cancellation_fee_status != FeeStatus.UNPAID:
+            raise Conflict("This ride has no unpaid fee.", code="no_fee_due")
+        ride.cancellation_fee_status = FeeStatus.WAIVED
+        ride.save(update_fields=["cancellation_fee_status", "updated_at"])
+    notify(ride.customer, "FEE_WAIVED", "Fee waived", "We have waived the fee for your cancelled ride.",
+           {"ride_id": str(ride.id)})
+    return ride
 
 
 def on_ride_paid(payment):
@@ -176,6 +309,7 @@ def tracking(customer, ride_id):
         "pickup": {"address": ride.pickup_address, "latitude": ride.pickup_latitude, "longitude": ride.pickup_longitude},
         "drop": {"address": ride.drop_address, "latitude": ride.drop_latitude, "longitude": ride.drop_longitude},
         "captain": None,
+        "start_pin": ride.start_pin if ride.status in PIN_VISIBLE_STATUSES else None,
     }
     if ride.captain_id and ride.status in IN_PROGRESS_STATUSES:
         captain = ride.captain
@@ -218,6 +352,60 @@ def rate_ride(customer, ride_id, rating, comment=""):
     captain.rating = Decimal(str(average)).quantize(Decimal("0.01"), ROUND_HALF_UP)
     captain.save(update_fields=["rating", "updated_at"])
     return Rating.objects.get(ride=ride)
+
+
+# ---------- trip sharing ----------
+
+def share_trip(customer, ride_id):
+    """Create (or reuse) the public link for an active ride."""
+    ride = get_object_or_404(Ride, pk=ride_id, customer=customer)
+    if ride.status not in ACTIVE_STATUSES:
+        raise Conflict("Only an active ride can be shared.", code="ride_not_active")
+    link = RideShareLink.objects.filter(ride=ride, revoked_at__isnull=True).first()
+    if link is None:
+        link = RideShareLink.objects.create(ride=ride, token=secrets.token_urlsafe(32))
+    return link
+
+
+def stop_sharing(customer, ride_id):
+    ride = get_object_or_404(Ride, pk=ride_id, customer=customer)
+    RideShareLink.objects.filter(ride=ride, revoked_at__isnull=True).update(revoked_at=timezone.now())
+
+
+def shared_trip(token):
+    """What a family member sees. No phone numbers and no PIN; captain location only while the ride is live."""
+    link = (
+        RideShareLink.objects.select_related("ride__captain__user", "ride__customer")
+        .filter(token=token, revoked_at__isnull=True)
+        .first()
+    )
+    if link is None:
+        raise Http404
+    ride = link.ride
+    ended_at = ride.completed_at or ride.cancelled_at
+    if ended_at and timezone.now() > ended_at + timedelta(minutes=PlatformConfig.load().share_link_grace_minutes):
+        raise Http404
+    data = {
+        "status": ride.status,
+        "rider_name": ride.customer.first_name or "Rider",
+        "vehicle_type": ride.vehicle_type,
+        "pickup": {"address": ride.pickup_address, "latitude": ride.pickup_latitude, "longitude": ride.pickup_longitude},
+        "drop": {"address": ride.drop_address, "latitude": ride.drop_latitude, "longitude": ride.drop_longitude},
+        "started_at": ride.started_at,
+        "completed_at": ride.completed_at,
+        "captain": None,
+    }
+    if ride.captain_id and ride.status in IN_PROGRESS_STATUSES:
+        captain = ride.captain
+        vehicle = captain.vehicles.filter(vehicle_type=ride.vehicle_type, is_verified=True).first()
+        data["captain"] = {
+            "name": captain.user.first_name or "Captain",
+            "latitude": captain.current_latitude,
+            "longitude": captain.current_longitude,
+            "last_location_at": captain.last_location_at,
+            "registration_number": vehicle.registration_number if vehicle else "",
+        }
+    return data
 
 
 # ---------- captain side ----------
@@ -311,12 +499,76 @@ def mark_arrived(captain, ride_id):
     return ride
 
 
-def start_ride(captain, ride_id):
+def start_ride(captain, ride_id, pin=None):
+    """Start the trip. When PINs are on, the captain must enter the rider's PIN, so the right
+    rider is in the right vehicle. Wrong guesses are limited per ride."""
+    config = PlatformConfig.load()
+    wrong_pin = False
     with transaction.atomic():
         ride = _captain_ride(captain, ride_id)
-        transition(ride, RideStatus.STARTED, actor=captain.user)
+        needs_pin = config.require_start_pin and ride.start_pin and ride.status == RideStatus.CAPTAIN_ARRIVED
+        if needs_pin and ride.start_pin_attempts >= config.start_pin_max_attempts:
+            raise RateLimited(
+                "Too many wrong PINs. Ask the rider to check the PIN in their app or contact support.",
+                code="pin_locked",
+            )
+        if needs_pin and not secrets.compare_digest(str(pin or ""), ride.start_pin):
+            if pin:
+                ride.start_pin_attempts += 1
+                ride.save(update_fields=["start_pin_attempts", "updated_at"])
+            wrong_pin = True
+        else:
+            transition(ride, RideStatus.STARTED, actor=captain.user)
+    if wrong_pin:
+        if not pin:
+            raise DomainError("Enter the rider's 4-digit PIN to start the ride.", code="pin_required")
+        raise DomainError("That PIN is not correct. Ask the rider for the PIN in their app.", code="wrong_pin")
     notify(ride.customer, "RIDE_STARTED", "Ride started", "Enjoy your trip.", {"ride_id": str(ride.id)})
     return ride
+
+
+def captain_cancel(captain, ride_id, reason, note=""):
+    """Captain drops an accepted ride.
+
+    - Rider no-show (after waiting at pickup) or rider asked: the ride is cancelled; a no-show fee may apply.
+    - Anything else: the ride goes back to searching and is offered to the next captain,
+      so the rider is not stranded. It counts against the captain's cancellation record.
+    """
+    config = PlatformConfig.load()
+    redispatch = reason not in (CaptainCancelReason.CUSTOMER_NOT_AT_PICKUP, CaptainCancelReason.CUSTOMER_ASKED)
+    with transaction.atomic():
+        ride = _captain_ride(captain, ride_id)
+        if ride.status not in (RideStatus.ACCEPTED, RideStatus.CAPTAIN_ARRIVED):
+            raise Conflict("This ride can no longer be cancelled.", code="not_cancellable")
+        if reason == CaptainCancelReason.CUSTOMER_NOT_AT_PICKUP:
+            if ride.status != RideStatus.CAPTAIN_ARRIVED:
+                raise Conflict("Mark yourself arrived at pickup first.", code="not_arrived")
+            if timezone.now() < ride.arrived_at + timedelta(minutes=config.no_show_wait_minutes):
+                raise Conflict(
+                    f"Please wait {config.no_show_wait_minutes} minutes at pickup before cancelling.",
+                    code="no_show_wait",
+                )
+        if redispatch:
+            transition(ride, RideStatus.SEARCHING, actor=captain.user, note=f"captain_cancelled:{reason}")
+            ride.captain = None
+            ride.accepted_at = None
+            ride.arrived_at = None
+            ride.start_pin_attempts = 0
+            ride.save(update_fields=["captain", "accepted_at", "arrived_at", "start_pin_attempts", "updated_at"])
+            subscription_services.release_surrender(ride)
+            profile = _free_captain(captain.pk)
+            profile.cancelled_rides += 1
+            profile.save(update_fields=["cancelled_rides", "updated_at"])
+
+    if redispatch:
+        notify(ride.customer, "CAPTAIN_CANCELLED", "Finding you another captain",
+               "Your captain had to cancel. We are matching you with someone nearby.", {"ride_id": str(ride.id)})
+        matching.advance(ride)
+        ride.refresh_from_db()
+        return ride
+
+    fee = config.customer_no_show_fee if reason == CaptainCancelReason.CUSTOMER_NOT_AT_PICKUP else Decimal("0")
+    return cancel_ride(ride, actor=captain.user, reason=reason, cancelled_by=CancelledBy.CAPTAIN, note=note, fee=fee)
 
 
 def complete_ride(captain, ride_id):
@@ -334,8 +586,9 @@ def complete_ride(captain, ride_id):
         captain.total_rides += 1
         captain.online_status = OnlineStatus.OFFLINE if eligibility_reasons(captain) else OnlineStatus.ONLINE
         captain.save(update_fields=["total_rides", "online_status", "updated_at"])
+        promo_services.on_ride_completed(ride)
 
-    notify(ride.customer, "RIDE_COMPLETED", "Ride completed", f"Fare: ₹{ride.final_fare}", {"ride_id": str(ride.id)})
+    notify(ride.customer, "RIDE_COMPLETED", "Ride completed", f"Fare: ₹{ride.payable_fare}", {"ride_id": str(ride.id)})
     notify(captain.user, "RIDE_COMPLETED", "Ride completed", f"Fare: ₹{ride.final_fare}", {"ride_id": str(ride.id)})
     return ride
 

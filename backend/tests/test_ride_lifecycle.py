@@ -34,7 +34,8 @@ def test_full_ride_flow_through_the_api(api, customer, captain):
     assert captain_api.post(f"/api/v1/captains/rides/{ride_id}/accept/").json()["status"] == "ACCEPTED"
     assert customer_api.get(f"/api/v1/rides/{ride_id}/tracking/").json()["captain"] is not None
     assert captain_api.post(f"/api/v1/captains/rides/{ride_id}/arrived/").json()["status"] == "CAPTAIN_ARRIVED"
-    assert captain_api.post(f"/api/v1/captains/rides/{ride_id}/start/").json()["status"] == "STARTED"
+    pin = customer_api.get(f"/api/v1/rides/{ride_id}/").json()["start_pin"]
+    assert captain_api.post(f"/api/v1/captains/rides/{ride_id}/start/", {"pin": pin}, format="json").json()["status"] == "STARTED"
     completed = captain_api.post(f"/api/v1/captains/rides/{ride_id}/complete/").json()
     assert completed["status"] == "COMPLETED"
 
@@ -84,7 +85,7 @@ def test_invalid_transitions_are_rejected():
     with pytest.raises(Conflict) as skip_to_complete:
         services.complete_ride(captain, ride.id)
     with pytest.raises(Conflict) as skip_start:
-        services.start_ride(captain, ride.id)
+        services.start_ride(captain, ride.id, pin=ride.start_pin)
 
     assert skip_to_complete.value.code == "invalid_transition"
     assert skip_start.value.code == "invalid_transition"
@@ -97,11 +98,11 @@ def test_completed_ride_cannot_be_started_or_cancelled():
     ride = services.create_ride(customer, ride_data())
     services.accept_offer(captain, ride.id)
     services.mark_arrived(captain, ride.id)
-    services.start_ride(captain, ride.id)
+    services.start_ride(captain, ride.id, pin=ride.start_pin)
     services.complete_ride(captain, ride.id)
 
     with pytest.raises(Conflict) as restart:
-        services.start_ride(captain, ride.id)
+        services.start_ride(captain, ride.id, pin=ride.start_pin)
     with pytest.raises(Conflict) as cancel:
         services.cancel_ride(ride, actor=customer)
 
@@ -145,7 +146,7 @@ def test_customer_cannot_cancel_a_started_ride():
     ride = services.create_ride(customer, ride_data())
     services.accept_offer(captain, ride.id)
     services.mark_arrived(captain, ride.id)
-    services.start_ride(captain, ride.id)
+    services.start_ride(captain, ride.id, pin=ride.start_pin)
 
     with pytest.raises(Conflict) as info:
         services.cancel_ride(ride, actor=customer)
@@ -204,7 +205,7 @@ def test_rating_needs_a_completed_ride_and_is_only_given_once(api, customer):
     too_early = customer_api.post(f"/api/v1/rides/{ride.id}/rating/", {"rating": 4}, format="json")
     services.accept_offer(captain, ride.id)
     services.mark_arrived(captain, ride.id)
-    services.start_ride(captain, ride.id)
+    services.start_ride(captain, ride.id, pin=ride.start_pin)
     services.complete_ride(captain, ride.id)
     first = customer_api.post(f"/api/v1/rides/{ride.id}/rating/", {"rating": 4}, format="json")
     second = customer_api.post(f"/api/v1/rides/{ride.id}/rating/", {"rating": 2}, format="json")
@@ -232,7 +233,7 @@ def test_cash_ride_is_collected_by_the_captain_not_paid_online(api, customer):
     ride = services.create_ride(customer, ride_data(payment_method="CASH"))
     services.accept_offer(captain, ride.id)
     services.mark_arrived(captain, ride.id)
-    services.start_ride(captain, ride.id)
+    services.start_ride(captain, ride.id, pin=ride.start_pin)
     services.complete_ride(captain, ride.id)
 
     online_attempt = as_client(customer).post(f"/api/v1/rides/{ride.id}/payment/", format="json")
@@ -263,7 +264,7 @@ def test_captain_stays_offline_when_the_plan_blocks_them_after_a_ride():
     ride = services.create_ride(customer, ride_data(payment_method="CASH"))
     services.accept_offer(captain, ride.id)
     services.mark_arrived(captain, ride.id)
-    services.start_ride(captain, ride.id)
+    services.start_ride(captain, ride.id, pin=ride.start_pin)
     CaptainProfile.objects.filter(pk=captain.pk).update(kyc_status="SUSPENDED")
 
     services.complete_ride(captain, ride.id)

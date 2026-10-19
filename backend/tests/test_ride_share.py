@@ -10,6 +10,7 @@ from apps.captains.services import update_location
 from apps.payments import services as payment_services
 from apps.rides import services
 from apps.rides.models import Ride, ShareReason
+from apps.vehicles.models import VehicleType
 from apps.subscriptions import services as subscription_services
 from apps.subscriptions.models import DueStatus, DueType, PlatformDue, RideShareDay, SubStatus
 from apps.users.models import Role
@@ -24,7 +25,7 @@ def run_ride(captain, rider, payment_method="CASH", drop=DROP):
     ride = services.create_ride(rider, ride_data(payment_method=payment_method, drop=drop))
     services.accept_offer(captain, ride.id)
     services.mark_arrived(captain, ride.id)
-    services.start_ride(captain, ride.id)
+    services.start_ride(captain, ride.id, pin=ride.start_pin)
     services.complete_ride(captain, ride.id)
     return Ride.objects.get(pk=ride.id)
 
@@ -83,7 +84,7 @@ def test_surrendering_one_of_the_first_four_rides_takes_that_ride(rider):
 
     services.surrender(captain, second.id)
     services.mark_arrived(captain, second.id)
-    services.start_ride(captain, second.id)
+    services.start_ride(captain, second.id, pin=second.start_pin)
     services.complete_ride(captain, second.id)
 
     second.refresh_from_db()
@@ -101,7 +102,7 @@ def test_only_one_surrender_per_day(rider):
     services.accept_offer(captain, first.id)
     services.surrender(captain, first.id)
     services.mark_arrived(captain, first.id)
-    services.start_ride(captain, first.id)
+    services.start_ride(captain, first.id, pin=first.start_pin)
     services.complete_ride(captain, first.id)
     second = services.create_ride(rider, ride_data(payment_method="CASH"))
     services.accept_offer(captain, second.id)
@@ -126,7 +127,7 @@ def test_surrender_is_refused_once_four_rides_are_done(rider):
 
     assert info.value.code == "surrender_window_closed"
     services.mark_arrived(captain, fifth.id)
-    services.start_ride(captain, fifth.id)
+    services.start_ride(captain, fifth.id, pin=fifth.start_pin)
     services.complete_ride(captain, fifth.id)
     fifth.refresh_from_db()
     assert fifth.share_reason == ShareReason.AUTO_5TH
@@ -165,6 +166,7 @@ def test_new_day_starts_a_fresh_count(clock, rider):
         run_ride(captain, rider)
 
     clock.advance(days=1)
+    captain_services.select_vehicle_for_today(captain, VehicleType.BIKE)
     day_two = [run_ride(captain, rider) for _ in range(5)]
 
     assert not any(r.is_platform_ride for r in day_two[:4])
@@ -188,6 +190,7 @@ def test_shortfall_day_creates_fee_blocks_going_online_and_penalises_the_next_fi
     assert blocked.value.code == "shortfall_fee_unpaid"
 
     settle_dues(captain)
+    captain_services.select_vehicle_for_today(captain, VehicleType.BIKE)
     captain_services.go_online(captain)
     penalty_ride = run_ride(captain, rider)
     assert penalty_ride.share_reason == ShareReason.PENALTY_FIRST_RIDE
@@ -201,6 +204,7 @@ def test_zero_ride_day_has_no_penalty(clock):
 
     clock.advance(days=2)
     call_command("run_periodic_jobs")
+    captain_services.select_vehicle_for_today(captain, VehicleType.BIKE)
 
     assert not PlatformDue.objects.filter(captain=captain, due_type=DueType.SHORTFALL_FEE).exists()
     assert captain_services.eligibility_reasons(captain) == []
@@ -261,7 +265,7 @@ def test_daily_plan_captain_is_not_counted_in_ride_share(rider):
 def test_switching_to_daily_activates_only_after_payment(api, rider):
     captain = ride_share_captain()
 
-    sub, payment = subscription_services.create_daily_subscription_payment(captain, "DAILY_30")
+    sub, payment = subscription_services.create_daily_subscription_payment(captain, "DAILY_BIKE")
     assert sub.status == SubStatus.PENDING
     assert subscription_services.active_subscription(captain).plan.plan_type == "RIDE_SHARE"
 
@@ -277,6 +281,6 @@ def test_plan_cannot_change_while_on_a_ride(rider):
     services.accept_offer(captain, ride.id)
 
     with pytest.raises(Conflict) as info:
-        subscription_services.switch_to_ride_share(captain, "RIDE_SHARE_1_IN_5")
+        subscription_services.switch_to_ride_share(captain, "RIDE_SHARE_BIKE")
 
     assert info.value.code == "ride_in_progress"
