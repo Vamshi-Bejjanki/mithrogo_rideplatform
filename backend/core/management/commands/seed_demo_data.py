@@ -38,7 +38,7 @@ class Command(BaseCommand):
 
     def _captains(self):
         from apps.captains.models import KycStatus
-        from apps.captains.services import ensure_profile, select_vehicle_for_today, update_location
+        from apps.captains.services import ensure_profile, update_location
         from apps.users.models import Role
         from apps.vehicles.models import Vehicle, VehicleType
         from apps.subscriptions import services as subscription_services
@@ -54,10 +54,9 @@ class Command(BaseCommand):
                 continue
             profile.kyc_status = KycStatus.APPROVED
             profile.save(update_fields=["kyc_status", "updated_at"])
-            vehicle_type = VehicleType.BIKE if index % 2 else VehicleType.AUTO
             Vehicle.objects.get_or_create(
                 captain=profile,
-                vehicle_type=vehicle_type,
+                vehicle_type=VehicleType.BIKE if index % 2 else VehicleType.AUTO,
                 defaults={
                     "registration_number": f"TSDEMO{index:04d}",
                     "make": "Bajaj",
@@ -66,10 +65,8 @@ class Command(BaseCommand):
                     "is_verified": True,
                 },
             )
-            select_vehicle_for_today(profile, vehicle_type)
             if not profile.subscriptions.filter(status="ACTIVE").exists():
-                # Each captain buys the daily plan for their own vehicle type.
-                sub, payment = subscription_services.create_daily_subscription_payment(profile, f"DAILY_{vehicle_type}")
+                sub, payment = subscription_services.create_daily_subscription_payment(profile, "DAILY_30")
                 payment_services.mark_success(payment.provider_order_id, f"demo_pay_{payment.id.hex[:12]}", payment.amount)
             update_location(profile, DEMO_LOCATION[0], DEMO_LOCATION[1])
             profiles.append(profile)

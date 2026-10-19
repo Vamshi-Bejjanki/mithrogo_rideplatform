@@ -59,5 +59,9 @@
 </div>
 {% endif %}
 
+<p><a class="button" href="/admin/rides/ride/?live=active">View live rides</a>
+   <a class="button" href="/admin/support/supportticket/?status__exact=OPEN">Open complaints</a>
+   <a class="button" href="/admin/captains/captainprofile/?kyc_status__exact=UNDER_REVIEW">KYC to review</a></p>
+
 {{ block.super }}
 {% endblock %}
