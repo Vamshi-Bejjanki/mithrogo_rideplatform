@@ -1,0 +1,20 @@
+{% extends "admin/base_site.html" %}
+
+{% block breadcrumbs %}<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Home</a> › Send announcement</div>{% endblock %}
+
+{% block content %}
+<p>Sends an in-app notification (and a push, once push is configured) to every active user in the audience.</p>
+<form method="post">
+  {% csrf_token %}
+  <fieldset class="module aligned">
+    {% for field in form %}
+    <div class="form-row">
+      {{ field.errors }}
+      <div class="flex-container"><label class="required" for="{{ field.id_for_label }}">{{ field.label }}:</label>{{ field }}</div>
+    </div>
+    {% endfor %}
+  </fieldset>
+  <div class="submit-row"><input type="submit" class="default" value="Send"
+       onclick="return confirm('Send this announcement now? It cannot be recalled.');"></div>
+</form>
+{% endblock %}

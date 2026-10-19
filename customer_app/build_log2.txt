@@ -1,0 +1,47 @@
+Running Gradle task 'assembleRelease'...                        
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/C:/Users/User/.gradle/wrapper/dists/gradle-9.3.1-all/9ot9r568e8zfvvd4mn8rbu1j0/gradle-9.3.1/lib/native-platform-0.22-milestone-29.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+The message received from the daemon indicates that the daemon has disappeared.
+Build request sent: Build{id=b31bf9e4-b315-4782-bac9-6db8a36f3749, currentDir=D:\projects\mithrogo_rideplatform\customer_app\android}
+Attempting to read last messages from the daemon log...
+Daemon pid: 14012
+  log file: C:\Users\User\.gradle\daemon\9.3.1\daemon-14012.out.log
+----- Last 20 lines from daemon log file - daemon-14012.out.log -----
+2026-10-19T21:38:27.166+0530 [DEBUG] [org.gradle.launcher.daemon.server.SynchronizedDispatchConnection] thread 83: received class org.gradle.launcher.daemon.protocol.Build
+2026-10-19T21:38:27.167+0530 [DEBUG] [org.gradle.launcher.daemon.server.DefaultDaemonConnection] thread 83: Received non-IO message from client: Build{id=b31bf9e4-b315-4782-bac9-6db8a36f3749, currentDir=D:\projects\mithrogo_rideplatform\customer_app\android}
+2026-10-19T21:38:27.168+0530 [INFO] [org.gradle.launcher.daemon.server.DefaultIncomingConnectionHandler] Received command: Build{id=b31bf9e4-b315-4782-bac9-6db8a36f3749, currentDir=D:\projects\mithrogo_rideplatform\customer_app\android}.
+2026-10-19T21:38:27.168+0530 [DEBUG] [org.gradle.launcher.daemon.server.DefaultIncomingConnectionHandler] Starting executing command: Build{id=b31bf9e4-b315-4782-bac9-6db8a36f3749, currentDir=D:\projects\mithrogo_rideplatform\customer_app\android} with connection: socket connection from /127.0.0.1:54115 to /127.0.0.1:65492.
+2026-10-19T21:38:27.176+0530 [DEBUG] [org.gradle.launcher.daemon.server.DaemonStateCoordinator] Command execution: started DaemonCommandExecution[command = Build{id=b31bf9e4-b315-4782-bac9-6db8a36f3749, currentDir=D:\projects\mithrogo_rideplatform\customer_app\android}, connection = DefaultDaemonConnection: socket connection from /127.0.0.1:54115 to /127.0.0.1:65492] after 6.27015 minutes of idle
+2026-10-19T21:38:27.177+0530 [INFO] [org.gradle.launcher.daemon.server.DaemonRegistryUpdater] Marking the daemon as busy, address: [87914117-526a-43fb-8699-9aa47b37d391 port:54115, addresses:[localhost/127.0.0.1]]
+2026-10-19T21:38:27.177+0530 [DEBUG] [org.gradle.launcher.daemon.registry.PersistentDaemonRegistry] Marking busy by address: [87914117-526a-43fb-8699-9aa47b37d391 port:54115, addresses:[localhost/127.0.0.1]]
+2026-10-19T21:38:27.185+0530 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Waiting to acquire exclusive lock on daemon addresses registry.
+2026-10-19T21:38:27.324+0530 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Lock acquired on daemon addresses registry.
+2026-10-19T21:38:27.332+0530 [DEBUG] [org.gradle.cache.internal.DefaultFileLockManager] Releasing lock on daemon addresses registry.
+2026-10-19T21:38:27.337+0530 [DEBUG] [org.gradle.launcher.daemon.server.DaemonStateCoordinator] resetting idle timer
+2026-10-19T21:38:27.340+0530 [DEBUG] [org.gradle.launcher.daemon.server.DaemonStateCoordinator] daemon is running. Sleeping until state changes.
+2026-10-19T21:38:27.369+0530 [INFO] [org.gradle.launcher.daemon.server.exec.StartBuildOrRespondWithBusy] Daemon is about to start building Build{id=b31bf9e4-b315-4782-bac9-6db8a36f3749, currentDir=D:\projects\mithrogo_rideplatform\customer_app\android}. Dispatching build started information...
+2026-10-19T21:38:27.370+0530 [DEBUG] [org.gradle.launcher.daemon.server.SynchronizedDispatchConnection] thread 85: dispatching org.gradle.launcher.daemon.protocol.BuildStarted@351c9a4b
+2026-10-19T21:38:27.583+0530 [DEBUG] [org.gradle.launcher.daemon.server.exec.EstablishBuildEnvironment] Configuring env variables: [PATH, POWERSHELL_EXECUTABLE, ALLUSERSPROFILE, CLAUDE_CODE_DISABLE_TERMINAL_TITLE, CLAUDE_CODE_OAUTH_SCOPES, COREPACK_ENABLE_AUTO_PIN, PROGRAMFILES, PSMODULEPATH, NODEFAULTCURRENTDIRECTORYINEXEPATH, DIRNAME, CLAUDE_AGENT_SDK_MCP_NO_PREFIX, USERNAME, IWBPATH, API_TIMEOUT_MS, PWD, CMD_LINE_ARGS, EXIT_WITH_ERRORLEVEL, PATHEXT, SNAPSHOT_PATH, CLAUDE_EFFORT, DISABLE_MICROCOMPACT, CLAUDE_CODE_DESKTOP_APP_VERSION, CLAUDE_CODE_SDK_HAS_HOST_AUTH_REFRESH, HOMEPATH, PROCESSOR_IDENTIFIER, PUBLIC, USE_LOCAL_OAUTH, ANTHROPIC_BASE_URL, CACHE_DIR, EXEPATH, SHLVL, ZES_ENABLE_SYSMAN, _SKIP, PYCHARM COMMUNITY EDITION, JAVA_HOME, FLUTTER_TOOLS_DIR, PROMPT, GIT_EDITOR, PROGRAMFILES(X86), TERM, CLAUDE_CODE_MESSAGING_TOKEN, MSYSTEM, APPDATA, CLAUDE_CODE_SESSION_ID, JAVA_EXE, CLAUDE_CODE_SESSION_ATTENDED, CLAUDE_CODE_ACCOUNT_UUID, _, CLAUDE_CODE_EXECPATH, DART, CLAUDE_PID, MSYS, COMPUTERNAME, CLAUDE_CODE_SIMPLE, NODE_USE_SYSTEM_CA, MCP_CONNECTION_NONBLOCKING, APP_BASE_NAME, PYTHONDONTWRITEBYTECODE, BAGGAGE, =D:, SNC_LIB_64, FLUTTER_ALREADY_LOCKED, HOMEDRIVE, SNC_LIB, NUMBER_OF_PROCESSORS, SENTRY-TRACE, CLAUDE_CODE_DISABLE_CRON, HUGGINGFACE_API_KEY, CLAUDE_CODE_STARTUP_FAILURE_RESULTS, USERDOMAIN_ROAMINGPROFILE, PROCESSOR_LEVEL, SYSTEMDRIVE, CLAUDE_CODE_ORGANIZATION_UUID, PROCESSOR_ARCHITECTURE, DRIVERDATA, CLAUDE_CODE_ENTRYPOINT, CLAUDECODE, PROGRAMDATA, CLAUDE_CODE_EAGER_FLUSH, USE_STAGING_OAUTH, CHROME_CRASHPAD_PIPE_NAME, CLAUDE_CODE_EMIT_TOOL_USE_SUMMARIES, ONEDRIVE, APP_HOME, MINGIT_PATH, SHELL, ONEDRIVECONSUMER, DASH__TOOL, MCP_SERVER_CONNECTION_BATCH_SIZE, AI_AGENT, OLDPWD, SHARED_BIN, WINDIR, CLAUDE_CODE_TERMINAL_MCP_TOOLS, CLAUDE_CODE_REPORT_FINDINGS, DASH__SUPPRESS_ANALYTICS, LOCALAPPDATA, COMMONPROGRAMFILES(X86), USERDOMAIN, DART_SDK_PATH, LOGONSERVER, PLINK_PROTOCOL, FLUTTER_ROOT, CLAUDE_CODE_USER_EMAIL, PROGRAMW6432, SYSTEMROOT, CLAUDE_CODE_CHILD_SESSION, OS, COMMONPROGRAMW6432, COMMONPROGRAMFILES, COMSPEC, CLAUDE_CODE_MESSAGING_SOCKET, PROCESSOR_REVISION, CLASSPATH, CLAUDE_CODE_ENABLE_ASK_USER_QUESTION_TOOL, CLAUDE_AGENT_SDK_VERSION, CLAUDE_CODE_HOST_SESSION_ID, CLAUDE_PREVIEW_CLASSIFIER_FLOOR, TEMP, USERPROFILE, DISABLE_AUTOUPDATER, TMP, CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING, HOME]
+2026-10-19T21:38:27.643+0530 [DEBUG] [org.gradle.launcher.daemon.server.exec.LogToClient] About to start relaying all logs to the client via the connection.
+2026-10-19T21:38:27.644+0530 [INFO] [org.gradle.launcher.daemon.server.exec.LogToClient] The client will now receive all logging from the daemon (pid: 14012). The daemon log file: C:\Users\User\.gradle\daemon\9.3.1\daemon-14012.out.log
+2026-10-19T21:38:29.101+0530 [INFO] [org.gradle.launcher.daemon.server.exec.LogAndCheckHealth] Starting 2nd build in daemon [uptime: 7 mins 38.309 secs, performance: 4%, GC rate: 0.00/s, heap usage: 0% of 8 GiB, non-heap usage: 1% of 4 GiB]
+2026-10-19T21:38:29.330+0530 [DEBUG] [org.gradle.launcher.daemon.server.exec.ExecuteBuild] The daemon has started executing the build.
+2026-10-19T21:38:29.379+0530 [DEBUG] [org.gradle.launcher.daemon.server.exec.ExecuteBuild] Executing build with daemon context: DefaultDaemonContext[uid=7e290516-ad34-4884-87f0-9be45790a413,javaHome=G:\Installations\Andriod_studio\jbr,javaVersion=25,javaVendor=JetBrains s.r.o.,daemonRegistryDir=C:\Users\User\.gradle\daemon,pid=14012,idleTimeout=10800000,priority=NORMAL,applyInstrumentationAgent=true,nativeServicesMode=ENABLED,daemonOpts=-XX:MaxMetaspaceSize=4G,-XX:ReservedCodeCacheSize=512m,-XX:+HeapDumpOnOutOfMemoryError,-Xmx8G,-Dfile.encoding=UTF-8,-Duser.country=IN,-Duser.language=en,-Duser.variant]----- End of the daemon log -----
+
+JVM crash log found: file:///D:/projects/mithrogo_rideplatform/customer_app/android/hs_err_pid14012.log
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Gradle build daemon disappeared unexpectedly (it may have been killed or may have crashed)
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+Running Gradle task 'assembleRelease'...                          975.9s
+Gradle task assembleRelease failed with exit code 1
