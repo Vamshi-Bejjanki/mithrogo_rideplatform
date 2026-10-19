@@ -3,6 +3,7 @@ from django.urls import path
 from apps.rides.captain_views import (
     AcceptView,
     ArrivedView,
+    CaptainCancelView,
     CaptainRideDetailView,
     CaptainRideListView,
     CollectCashView,
@@ -24,4 +25,5 @@ urlpatterns = [
     path("rides/<uuid:pk>/complete/", CompleteView.as_view(), name="captain-complete"),
     path("rides/<uuid:pk>/surrender/", SurrenderView.as_view(), name="captain-surrender"),
     path("rides/<uuid:pk>/collect-cash/", CollectCashView.as_view(), name="captain-collect-cash"),
+    path("rides/<uuid:pk>/cancel/", CaptainCancelView.as_view(), name="captain-cancel"),
 ]

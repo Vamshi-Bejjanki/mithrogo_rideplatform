@@ -6,7 +6,12 @@ from rest_framework.views import APIView
 from apps.captains.services import ensure_profile
 from apps.rides import services
 from apps.rides.models import Ride
-from apps.rides.serializers import CaptainRideSerializer, OfferSerializer
+from apps.rides.serializers import (
+    CaptainCancelSerializer,
+    CaptainRideSerializer,
+    OfferSerializer,
+    StartRideSerializer,
+)
 from apps.users.permissions import IsCaptain
 
 
@@ -67,9 +72,23 @@ class ArrivedView(_RideActionView):
         return services.mark_arrived(captain, ride_id)
 
 
-class StartView(_RideActionView):
-    def perform(self, captain, ride_id):
-        return services.start_ride(captain, ride_id)
+class StartView(CaptainMixin, APIView):
+    """Body: {"pin": "1234"}, the rider's PIN, when ride start PINs are on."""
+
+    def post(self, request, pk):
+        serializer = StartRideSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ride = services.start_ride(self.captain, pk, pin=serializer.validated_data["pin"])
+        return Response(CaptainRideSerializer(ride).data)
+
+
+class CaptainCancelView(CaptainMixin, APIView):
+    def post(self, request, pk):
+        serializer = CaptainCancelSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        ride = services.captain_cancel(self.captain, pk, data["reason"], data["note"])
+        return Response(CaptainRideSerializer(ride).data)
 
 
 class CompleteView(_RideActionView):

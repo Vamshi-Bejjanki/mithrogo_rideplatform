@@ -6,7 +6,16 @@ from apps.subscriptions.models import CaptainSubscription, PlatformDue, Subscrip
 class SubscriptionPlanSerializer(serializers.ModelSerializer):
     class Meta:
         model = SubscriptionPlan
-        fields = ["code", "name", "plan_type", "amount", "duration_days", "qualifying_rides", "shortfall_fee"]
+        fields = [
+            "code",
+            "name",
+            "plan_type",
+            "amount",
+            "vehicle_type",
+            "duration_hours",
+            "qualifying_rides",
+            "shortfall_fee",
+        ]
         read_only_fields = fields
 
 

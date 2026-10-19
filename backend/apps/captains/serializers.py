@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.captains.models import CaptainProfile, KycDocument
+from apps.vehicles.models import VehicleType
 
 
 class CaptainProfileSerializer(serializers.ModelSerializer):
@@ -45,3 +46,7 @@ class LocationSerializer(serializers.Serializer):
     longitude = serializers.DecimalField(max_digits=9, decimal_places=6, min_value=-180, max_value=180)
     heading = serializers.DecimalField(max_digits=6, decimal_places=2, required=False, allow_null=True)
     speed = serializers.DecimalField(max_digits=6, decimal_places=2, required=False, allow_null=True, min_value=0)
+
+
+class VehicleOfDaySerializer(serializers.Serializer):
+    vehicle_type = serializers.ChoiceField(choices=VehicleType.choices)

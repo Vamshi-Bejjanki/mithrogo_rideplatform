@@ -7,8 +7,9 @@ from apps.rides.models import RideEvent, RideStatus
 ALLOWED_TRANSITIONS = {
     RideStatus.REQUESTED: {RideStatus.SEARCHING, RideStatus.CANCELLED},
     RideStatus.SEARCHING: {RideStatus.ACCEPTED, RideStatus.CANCELLED},
-    RideStatus.ACCEPTED: {RideStatus.CAPTAIN_ARRIVED, RideStatus.CANCELLED},
-    RideStatus.CAPTAIN_ARRIVED: {RideStatus.STARTED, RideStatus.CANCELLED},
+    # Back to SEARCHING only when the captain drops the ride, so it is offered to someone else.
+    RideStatus.ACCEPTED: {RideStatus.CAPTAIN_ARRIVED, RideStatus.CANCELLED, RideStatus.SEARCHING},
+    RideStatus.CAPTAIN_ARRIVED: {RideStatus.STARTED, RideStatus.CANCELLED, RideStatus.SEARCHING},
     RideStatus.STARTED: {RideStatus.COMPLETED},
     RideStatus.COMPLETED: set(),
     RideStatus.CANCELLED: set(),

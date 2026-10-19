@@ -9,11 +9,13 @@ from apps.captains.views import (
     LocationView,
     OfflineView,
     OnlineView,
+    TodayVehicleView,
 )
 
 urlpatterns = [
     path("profile/", CaptainProfileView.as_view(), name="captain-profile"),
     path("status/", CaptainStatusView.as_view(), name="captain-status"),
+    path("vehicle-of-day/", TodayVehicleView.as_view(), name="captain-vehicle-of-day"),
     path("status/online/", OnlineView.as_view(), name="captain-online"),
     path("status/offline/", OfflineView.as_view(), name="captain-offline"),
     path("kyc/", KycSubmitView.as_view(), name="captain-kyc"),

@@ -1,0 +1,49 @@
+{% extends "admin/base_site.html" %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+  .report-form { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; margin: 8px 0 16px; }
+  .report-form label { display: block; font-size: .8rem; color: var(--body-quiet-color, #666); }
+  .report-table { overflow-x: auto; }
+  .report-table td, .report-table th { white-space: nowrap; }
+  .report-table tfoot td { font-weight: 700; border-top: 2px solid var(--hairline-color, #ccc); }
+  .chart { display: flex; align-items: flex-end; gap: 4px; height: 120px; margin: 8px 0; }
+  .chart .bar { flex: 1; background: #0b8f5a; border-radius: 3px 3px 0 0; min-height: 2px; }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Home</a> › Reports</div>{% endblock %}
+
+{% block content %}
+<form class="report-form" method="get">
+  <div><label for="report">Report</label>
+    <select name="report" id="report">
+      <option value="daily" {% if kind == "daily" %}selected{% endif %}>Daily rides and revenue</option>
+      <option value="earnings" {% if kind == "earnings" %}selected{% endif %}>Captain earnings</option>
+    </select></div>
+  <div><label for="from">From</label><input type="date" name="from" id="from" value="{{ start|date:'Y-m-d' }}"></div>
+  <div><label for="to">To</label><input type="date" name="to" id="to" value="{{ end|date:'Y-m-d' }}"></div>
+  <div><input type="submit" value="Show"></div>
+  <div><button type="submit" name="export" value="csv" class="button">Download CSV</button></div>
+</form>
+
+{% if chart %}
+<div class="module" style="padding: 8px 16px;">
+  <strong>Gross fares per day</strong>
+  <div class="chart">{% for day in chart %}<div class="bar" style="height: {{ day.fares_pct }}%" title="{{ day.date }}: ₹{{ day.fares }}"></div>{% endfor %}</div>
+</div>
+{% endif %}
+
+<div class="module report-table">
+  {% if table %}
+  <table style="width: 100%">
+    <thead><tr>{% for column in columns %}<th>{{ column }}</th>{% endfor %}</tr></thead>
+    <tbody>{% for row in table %}<tr>{% for value in row %}<td>{{ value }}</td>{% endfor %}</tr>{% endfor %}</tbody>
+    {% if totals %}<tfoot><tr><td>Total</td>{% for column in columns %}{% if not forloop.first %}<td>{% for k, v in totals.items %}{% if k == column %}{{ v }}{% endif %}{% endfor %}</td>{% endif %}{% endfor %}</tr></tfoot>{% endif %}
+  </table>
+  {% else %}
+  <p style="padding: 12px;">No data for this period.</p>
+  {% endif %}
+</div>
+{% endblock %}

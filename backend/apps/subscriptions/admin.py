@@ -1,25 +1,9 @@
 from django.contrib import admin
-from django.utils import timezone
 
-from core.admin import AuditedModelAdmin, run_action
-from core.exceptions import Conflict
-from apps.subscriptions.models import CaptainSubscription, DueStatus, PlatformDue, RideShareDay, SubscriptionPlan
-
-
-def _waive(due, actor):
-    if due.status != DueStatus.PENDING:
-        raise Conflict("Only pending dues can be waived.", code="not_pending")
-    due.status = DueStatus.WAIVED
-    due.save(update_fields=["status", "updated_at"])
-
-
-def _mark_settled_offline(due, actor):
-    """Admin confirms the captain paid in cash or by bank transfer, outside the gateway."""
-    if due.status != DueStatus.PENDING:
-        raise Conflict("Only pending dues can be settled.", code="not_pending")
-    due.status = DueStatus.SETTLED
-    due.settled_at = timezone.now()
-    due.save(update_fields=["status", "settled_at", "updated_at"])
+from core.admin import AuditedModelAdmin, csv_export_action, run_action
+from apps.subscriptions.models import CaptainSubscription, PlatformDue, RideShareDay, SubscriptionPlan
+from apps.subscriptions.services import settle_due_offline as _mark_settled_offline
+from apps.subscriptions.services import waive_due as _waive
 
 
 @admin.register(SubscriptionPlan)
@@ -29,7 +13,8 @@ class SubscriptionPlanAdmin(AuditedModelAdmin):
         "name",
         "plan_type",
         "amount",
-        "duration_days",
+        "vehicle_type",
+        "duration_hours",
         "qualifying_rides",
         "shortfall_fee",
         "is_active",
@@ -78,7 +63,12 @@ class PlatformDueAdmin(AuditedModelAdmin):
     list_filter = ("due_type", "status")
     search_fields = ("captain__user__phone",)
     raw_id_fields = ("captain", "ride", "payment")
-    actions = ["mark_settled_offline", "waive_dues"]
+    actions = ["mark_settled_offline", "waive_dues", "export_csv"]
+    export_csv = csv_export_action(
+        [("captain", "captain__user__phone"), ("type", "due_type"), ("amount", "amount"), ("status", "status"),
+         ("ride", "ride_id"), ("created_at", "created_at"), ("settled_at", "settled_at")],
+        "platform-dues",
+    )
 
     @admin.action(description="Mark selected dues as settled (paid outside the gateway)")
     def mark_settled_offline(self, request, queryset):

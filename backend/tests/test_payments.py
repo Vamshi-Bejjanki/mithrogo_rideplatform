@@ -64,7 +64,7 @@ def test_amount_must_match_the_order(api, rider):
 @pytest.mark.django_db
 def test_duplicate_webhook_does_not_activate_twice(api):
     captain = make_captain(plan=None, location=None, online=False)
-    sub, payment = subscription_services.create_daily_subscription_payment(captain, "DAILY_30")
+    sub, payment = subscription_services.create_daily_subscription_payment(captain, "DAILY_BIKE")
     event = captured_event(payment)
 
     first = send_webhook(api, event)
@@ -83,7 +83,7 @@ def test_captain_can_buy_daily_plan_and_verify_status_before_and_after_payment(a
     captain = make_captain(plan=None, location=None, online=False)
     captain_api = as_user(captain.user)
 
-    created = captain_api.post("/api/v1/captains/subscription/create-payment/", {"plan_code": "DAILY_30"}, format="json")
+    created = captain_api.post("/api/v1/captains/subscription/create-payment/", {"plan_code": "DAILY_BIKE"}, format="json")
     assert created.status_code == 201
     payment_id = created.json()["payment"]["id"]
     before = captain_api.post("/api/v1/captains/subscription/verify-payment/", {"payment_id": payment_id}, format="json")
@@ -102,7 +102,7 @@ def test_mobile_success_alone_never_activates_a_subscription(as_user):
     captain = make_captain(plan=None, location=None, online=False)
     from apps.subscriptions import services as subscription_services
 
-    sub, payment = subscription_services.create_daily_subscription_payment(captain, "DAILY_30")
+    sub, payment = subscription_services.create_daily_subscription_payment(captain, "DAILY_BIKE")
     response = as_user(captain.user).post(
         "/api/v1/captains/subscription/verify-payment/", {"payment_id": str(payment.id)}, format="json"
     )

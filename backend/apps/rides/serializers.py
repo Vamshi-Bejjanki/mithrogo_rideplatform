@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from apps.rides.models import PaymentMethod, Ride, RideOffer
+from apps.rides.models import CaptainCancelReason, CustomerCancelReason, PaymentMethod, Ride, RideOffer
 from apps.vehicles.models import VehicleType
 
 
@@ -13,6 +13,7 @@ class CoordinatesMixin(serializers.Serializer):
 
 class EstimateSerializer(CoordinatesMixin):
     vehicle_type = serializers.ChoiceField(choices=VehicleType.choices)
+    promo_code = serializers.CharField(max_length=24, required=False, allow_blank=True)
 
 
 class RideCreateSerializer(EstimateSerializer):
@@ -26,13 +27,36 @@ class RatingInputSerializer(serializers.Serializer):
     comment = serializers.CharField(max_length=500, required=False, allow_blank=True, default="")
 
 
+class CustomerCancelSerializer(serializers.Serializer):
+    reason = serializers.ChoiceField(choices=CustomerCancelReason.choices, default=CustomerCancelReason.OTHER)
+    note = serializers.CharField(max_length=300, required=False, allow_blank=True, default="")
+
+
+class CaptainCancelSerializer(serializers.Serializer):
+    reason = serializers.ChoiceField(choices=CaptainCancelReason.choices)
+    note = serializers.CharField(max_length=300, required=False, allow_blank=True, default="")
+
+
+class StartRideSerializer(serializers.Serializer):
+    pin = serializers.CharField(max_length=4, required=False, allow_blank=True, default="")
+
+
 class RatingOutputSerializer(serializers.Serializer):
     rating = serializers.IntegerField()
     comment = serializers.CharField()
 
 
+PIN_VISIBLE = {"SEARCHING", "ACCEPTED", "CAPTAIN_ARRIVED"}
+
+
 class RideSerializer(serializers.ModelSerializer):
+    """The customer's view of a ride."""
+
     captain = serializers.SerializerMethodField()
+    start_pin = serializers.SerializerMethodField()
+    payable_fare = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    is_rated = serializers.SerializerMethodField()
+    my_rating = serializers.SerializerMethodField()
 
     class Meta:
         model = Ride
@@ -59,9 +83,35 @@ class RideSerializer(serializers.ModelSerializer):
             "completed_at",
             "cancelled_at",
             "cancellation_reason",
+            "cancelled_by",
+            "cancellation_note",
+            "cancellation_fee",
+            "cancellation_fee_status",
+            "promo_code",
+            "discount_amount",
+            "payable_fare",
+            "start_pin",
+            "is_rated",
+            "my_rating",
             "captain",
         ]
         read_only_fields = fields
+
+    def get_start_pin(self, ride):
+        return ride.start_pin if ride.status in PIN_VISIBLE else None
+
+    def _rating(self, ride):
+        try:
+            return ride.rating
+        except Ride.rating.RelatedObjectDoesNotExist:
+            return None
+
+    def get_is_rated(self, ride):
+        return self._rating(ride) is not None
+
+    def get_my_rating(self, ride):
+        rating = self._rating(ride)
+        return None if rating is None else {"rating": rating.rating, "comment": rating.comment}
 
     def get_captain(self, ride):
         if ride.captain_id is None:
@@ -74,11 +124,20 @@ class RideSerializer(serializers.ModelSerializer):
         }
 
 
+_CUSTOMER_ONLY = {"start_pin", "is_rated", "my_rating", "promo_code"}
+
+
 class CaptainRideSerializer(RideSerializer):
+    """The captain's view. Never includes the start PIN: the rider tells it to the captain."""
+
     customer_name = serializers.SerializerMethodField()
+    start_pin = None
+    is_rated = None
+    my_rating = None
 
     class Meta(RideSerializer.Meta):
-        fields = RideSerializer.Meta.fields + [
+        fields = [f for f in RideSerializer.Meta.fields if f not in _CUSTOMER_ONLY] + [
+            "start_pin_attempts",
             "customer_name",
             "is_platform_ride",
             "share_reason",

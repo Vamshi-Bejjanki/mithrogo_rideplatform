@@ -69,9 +69,10 @@ def test_plans_list_shows_only_active_plans_with_database_values(as_user):
     response = as_user(captain.user).get("/api/v1/captains/subscription/plans/")
 
     codes = {plan["code"]: plan for plan in response.json()}
-    assert set(codes) == {"DAILY_30", "RIDE_SHARE_1_IN_5"}
-    assert Decimal(codes["DAILY_30"]["amount"]) == Decimal("30.00")
-    assert codes["RIDE_SHARE_1_IN_5"]["qualifying_rides"] == 5
+    assert set(codes) == {"DAILY_BIKE", "RIDE_SHARE_BIKE"}  # bike captain sees bike plans only
+    assert Decimal(codes["DAILY_BIKE"]["amount"]) == Decimal("30.00")
+    assert codes["DAILY_BIKE"]["duration_hours"] == 12
+    assert codes["RIDE_SHARE_BIKE"]["qualifying_rides"] == 5
 
 
 @pytest.mark.django_db
@@ -81,7 +82,7 @@ def test_subscription_summary_shows_today_for_a_ride_share_captain(as_user):
     response = as_user(captain.user).get("/api/v1/captains/subscription/")
 
     body = response.json()
-    assert body["subscription"]["plan"]["code"] == "RIDE_SHARE_1_IN_5"
+    assert body["subscription"]["plan"]["code"] == "RIDE_SHARE_BIKE"
     assert body["today"] == {
         "qualifying_rides": 5,
         "completed_rides": 0,
@@ -98,7 +99,7 @@ def test_earnings_separate_fares_from_the_platform_share(as_user):
         ride = services.create_ride(rider, ride_data(payment_method="CASH"))
         services.accept_offer(captain, ride.id)
         services.mark_arrived(captain, ride.id)
-        services.start_ride(captain, ride.id)
+        services.start_ride(captain, ride.id, pin=ride.start_pin)
         services.complete_ride(captain, ride.id)
         update_location(captain, NEAR_PICKUP[0], NEAR_PICKUP[1])
 

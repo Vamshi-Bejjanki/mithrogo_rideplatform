@@ -7,6 +7,7 @@ from apps.captains.serializers import (
     KycDocumentSerializer,
     KycSubmitSerializer,
     LocationSerializer,
+    VehicleOfDaySerializer,
 )
 from apps.captains.services import (
     describe_reasons,
@@ -14,7 +15,9 @@ from apps.captains.services import (
     ensure_profile,
     go_offline,
     go_online,
+    select_vehicle_for_today,
     submit_kyc,
+    todays_vehicle_type,
 )
 from apps.users.permissions import IsCaptain
 
@@ -42,6 +45,7 @@ class CaptainStatusView(CaptainMixin, APIView):
             {
                 "online_status": captain.online_status,
                 "kyc_status": captain.kyc_status,
+                "today_vehicle_type": todays_vehicle_type(captain),
                 "eligible": not reasons,
                 "reasons": reasons,
                 "message": describe_reasons(reasons),
@@ -76,6 +80,16 @@ class LocationView(CaptainMixin, APIView):
 
         record_captain_location(self.captain, data)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class TodayVehicleView(CaptainMixin, APIView):
+    """Choose the vehicle worked with today. Needed once per service day before going online."""
+
+    def post(self, request):
+        serializer = VehicleOfDaySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        captain = select_vehicle_for_today(self.captain, serializer.validated_data["vehicle_type"])
+        return Response({"today_vehicle_type": todays_vehicle_type(captain)})
 
 
 class OnlineView(CaptainMixin, APIView):

@@ -39,6 +39,12 @@ def _dispatch_success(payment):
         subscription_services.on_dues_paid(payment)
     elif payment.payment_type == PaymentType.RIDE_PAYMENT:
         ride_services.on_ride_paid(payment)
+    elif payment.payment_type == PaymentType.CANCELLATION_FEE:
+        ride_services.on_fee_paid(payment)
+    elif payment.payment_type == PaymentType.WALLET_TOP_UP:
+        from apps.wallets import services as wallet_services
+
+        wallet_services.on_top_up_paid(payment)
 
 
 def mark_success(provider_order_id, provider_payment_id, amount):

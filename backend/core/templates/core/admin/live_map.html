@@ -1,0 +1,73 @@
+{% extends "admin/base_site.html" %}
+
+{% block extrahead %}
+{{ block.super }}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  #map { height: 70vh; border-radius: 8px; border: 1px solid var(--hairline-color, #ddd); }
+  .legend { display: flex; gap: 16px; margin: 8px 0 12px; font-size: .85rem; align-items: center; flex-wrap: wrap; }
+  .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+  #stamp { color: var(--body-quiet-color, #666); margin-left: auto; }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Home</a> › Live map</div>{% endblock %}
+
+{% block content %}
+<div class="legend">
+  <span><span class="dot" style="background:#0b8f5a"></span>Online captain</span>
+  <span><span class="dot" style="background:#f57c00"></span>Captain on a ride</span>
+  <span><span class="dot" style="background:#1565c0"></span>Pickup</span>
+  <span><span class="dot" style="background:#c62828"></span>Drop</span>
+  <span id="counts"></span>
+  <span id="stamp">Loading…</span>
+</div>
+<div id="map"></div>
+<script>
+(function () {
+  var map = L.map("map").setView([18.6725, 78.094], 13);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: "&copy; OpenStreetMap contributors"
+  }).addTo(map);
+  var layer = L.layerGroup().addTo(map);
+  var fitted = false;
+
+  function circle(latlng, color, radius) {
+    return L.circleMarker(latlng, { radius: radius, color: color, fillColor: color, fillOpacity: 0.85, weight: 2 });
+  }
+  function esc(text) { var d = document.createElement("div"); d.textContent = text == null ? "" : text; return d.innerHTML; }
+
+  function refresh() {
+    fetch("{% url 'admin:live_map_data' %}", { credentials: "same-origin" })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        layer.clearLayers();
+        var bounds = [];
+        data.captains.forEach(function (c) {
+          if (c.position[0] == null) return;
+          bounds.push(c.position);
+          circle(c.position, c.status === "BUSY" ? "#f57c00" : "#0b8f5a", 8).addTo(layer)
+            .bindPopup("<b>" + esc(c.name) + "</b><br>" + esc(c.status) + "<br><a href='" + c.url + "'>Open captain</a>");
+        });
+        data.rides.forEach(function (ride) {
+          bounds.push(ride.pickup, ride.drop);
+          L.polyline([ride.pickup, ride.drop], { color: "#555", weight: 2, dashArray: "4 6" }).addTo(layer);
+          var popup = "<b>" + esc(ride.status) + "</b> · " + esc(ride.vehicle_type) + "<br>" + esc(ride.pickup_address) +
+            " → " + esc(ride.drop_address) + "<br>Rider " + esc(ride.customer) +
+            (ride.captain ? "<br>Captain " + esc(ride.captain) : "") + "<br><a href='" + ride.url + "'>Open ride</a>";
+          circle(ride.pickup, "#1565c0", 6).addTo(layer).bindPopup(popup);
+          circle(ride.drop, "#c62828", 6).addTo(layer).bindPopup(popup);
+        });
+        if (!fitted && bounds.length) { map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 }); fitted = true; }
+        document.getElementById("counts").textContent =
+          data.rides.length + " active ride(s), " + data.captains.length + " captain(s) online";
+        document.getElementById("stamp").textContent = "Updated " + new Date().toLocaleTimeString();
+      })
+      .catch(function () { document.getElementById("stamp").textContent = "Could not refresh, retrying…"; });
+  }
+  refresh();
+  setInterval(refresh, 5000);
+})();
+</script>
+{% endblock %}

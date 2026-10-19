@@ -4,4 +4,5 @@
 
 - Customer/captain report-issue APIs
 - Admin complaint handling
-- Later: SOS and emergency contact flow
+- `TicketMessage`: the conversation on a ticket (user and staff replies)
+- `SosAlert`: emergencies from the apps; every admin is alerted and a SAFETY ticket is opened

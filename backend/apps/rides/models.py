@@ -40,6 +40,39 @@ class RidePaymentStatus(models.TextChoices):
     PAID = "PAID", "Paid"
 
 
+class CancelledBy(models.TextChoices):
+    CUSTOMER = "CUSTOMER", "Customer"
+    CAPTAIN = "CAPTAIN", "Captain"
+    SYSTEM = "SYSTEM", "System"
+    ADMIN = "ADMIN", "Admin"
+
+
+class CustomerCancelReason(models.TextChoices):
+    CHANGED_MIND = "CHANGED_MIND", "Changed my mind"
+    CAPTAIN_DELAYED = "CAPTAIN_DELAYED", "Captain is taking too long"
+    WRONG_PICKUP = "WRONG_PICKUP", "Wrong pickup location"
+    CAPTAIN_ASKED = "CAPTAIN_ASKED", "Captain asked me to cancel"
+    FOUND_OTHER_RIDE = "FOUND_OTHER_RIDE", "Found another ride"
+    SAFETY = "SAFETY", "Safety concern"
+    OTHER = "OTHER", "Other"
+
+
+class CaptainCancelReason(models.TextChoices):
+    CUSTOMER_NOT_AT_PICKUP = "CUSTOMER_NOT_AT_PICKUP", "Rider did not come to pickup"
+    CUSTOMER_ASKED = "CUSTOMER_ASKED", "Rider asked me to cancel"
+    VEHICLE_ISSUE = "VEHICLE_ISSUE", "Vehicle problem"
+    PICKUP_UNREACHABLE = "PICKUP_UNREACHABLE", "Cannot reach the pickup"
+    SAFETY = "SAFETY", "Safety concern"
+    OTHER = "OTHER", "Other"
+
+
+class FeeStatus(models.TextChoices):
+    NONE = "NONE", "No fee"
+    UNPAID = "UNPAID", "Unpaid"
+    PAID = "PAID", "Paid"
+    WAIVED = "WAIVED", "Waived"
+
+
 class ShareReason(models.TextChoices):
     SURRENDERED = "SURRENDERED", "Captain surrendered"
     AUTO_5TH = "AUTO_5TH", "Automatic (qualifying ride)"
@@ -103,6 +136,18 @@ class Ride(TimeStampedModel):
     completed_at = models.DateTimeField(null=True, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
     cancellation_reason = models.CharField(max_length=60, blank=True)
+    cancelled_by = models.CharField(max_length=10, choices=CancelledBy.choices, blank=True)
+    cancellation_note = models.CharField(max_length=300, blank=True)
+    cancellation_fee = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    cancellation_fee_status = models.CharField(max_length=8, choices=FeeStatus.choices, default=FeeStatus.NONE)
+
+    start_pin = models.CharField(max_length=4, blank=True, help_text="Rider shares this with the captain to start.")
+    start_pin_attempts = models.PositiveSmallIntegerField(default=0)
+
+    promo_code = models.CharField(max_length=24, blank=True)
+    discount_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0, help_text="Platform-funded discount. Captain earns the full fare."
+    )
 
     is_platform_ride = models.BooleanField(default=False)
     platform_share_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
@@ -137,6 +182,12 @@ class Ride(TimeStampedModel):
 
     def __str__(self):
         return f"Ride {str(self.id)[:8]} ({self.status})"
+
+    @property
+    def payable_fare(self):
+        """What the rider pays: the fare less any promo discount."""
+        fare = self.final_fare if self.final_fare is not None else self.estimated_fare
+        return max(fare - self.discount_amount, 0)
 
 
 class RideEvent(models.Model):
@@ -191,3 +242,15 @@ class Rating(models.Model):
     rating = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)])
     comment = models.CharField(max_length=500, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class RideShareLink(models.Model):
+    """A public, unguessable link a rider sends to family to follow the trip."""
+
+    ride = models.ForeignKey(Ride, on_delete=models.CASCADE, related_name="share_links")
+    token = models.CharField(max_length=43, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Share link for ride {str(self.ride_id)[:8]}"
