@@ -143,7 +143,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
           Align(
             alignment: Alignment.center,
             child: Padding(
-              padding: const EdgeInsets.only(top: _logoSize + 48),
+              padding: const EdgeInsets.only(top: _logoSize + 112),
               child: SlideTransition(
                 position: Tween(
                   begin: const Offset(0, 0.15),
@@ -257,7 +257,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 }
 
-/// "MithroGo" typed out letter by letter: each one pops up from below in turn,
+/// "MithrGo" typed out letter by letter: each one pops up from below in turn,
 /// "Go" lands heavier, and an underline swoosh draws in under the word at the end.
 class _AnimatedWordmark extends StatelessWidget {
   const _AnimatedWordmark({

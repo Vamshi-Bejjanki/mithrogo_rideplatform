@@ -1,6 +1,6 @@
 # admin_web
 
-Operations console for MithroGo (Next.js, TypeScript). It runs alongside Django Admin and uses the same backend through the `admin/` REST API, so every change is audit-logged server-side.
+Operations console for MithrGo (Next.js, TypeScript). It runs alongside Django Admin and uses the same backend through the `admin/` REST API, so every change is audit-logged server-side.
 
 ## Screens
 

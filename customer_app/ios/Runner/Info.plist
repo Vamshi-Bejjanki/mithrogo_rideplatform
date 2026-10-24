@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>MithroGo</string>
+	<string>MithrGo</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>tel</string>

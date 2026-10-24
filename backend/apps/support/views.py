@@ -27,7 +27,7 @@ class TicketMessageSerializer(serializers.ModelSerializer):
 
     def get_author_name(self, message):
         if message.is_staff:
-            return "MithroGo Support"
+            return "MithrGo Support"
         return message.author.first_name if message.author else ""
 
 

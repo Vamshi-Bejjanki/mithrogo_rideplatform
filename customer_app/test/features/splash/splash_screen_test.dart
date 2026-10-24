@@ -29,7 +29,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(find.byIcon(Icons.two_wheeler), findsOneWidget);
-    expect(find.bySemanticsLabel('MithroGo'), findsOneWidget);
+    expect(find.bySemanticsLabel('MithrGo'), findsOneWidget);
     expect(container.read(sessionControllerProvider).status, SessionStatus.unknown);
 
     await tester.pump(SplashScreen.minimumDuration);

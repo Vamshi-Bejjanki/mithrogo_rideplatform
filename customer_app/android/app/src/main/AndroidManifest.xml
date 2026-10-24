@@ -2,7 +2,7 @@
     <!-- Needed for API calls. Release builds must use https. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="MithroGo"
+        android:label="MithrGo"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
