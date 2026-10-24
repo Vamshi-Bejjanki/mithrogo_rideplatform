@@ -37,6 +37,9 @@ def _waive(ride, actor):
 
     services.waive_fee(ride, actor)
 
+from core.admin import AuditedModelAdmin
+from apps.rides.models import ACTIVE_STATUSES, FareConfig, Rating, Ride, RideEvent, RideOffer
+
 
 class LiveRideFilter(admin.SimpleListFilter):
     """Quick switch between rides in progress (the live view) and finished ones."""
