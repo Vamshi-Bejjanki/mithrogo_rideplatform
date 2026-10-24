@@ -4,8 +4,8 @@ import "leaflet/dist/leaflet.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "MithroGo Admin",
-  description: "Operations dashboard for the MithroGo ride platform",
+  title: "MithrGo Admin",
+  description: "Operations dashboard for the MithrGo ride platform",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

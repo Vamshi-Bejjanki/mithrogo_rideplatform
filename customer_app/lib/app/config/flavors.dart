@@ -10,7 +10,7 @@ class Flavors {
 
   static bool get isProd => current == Flavor.prod;
 
-  static const String appName = 'MithroGo';
+  static const String appName = 'MithrGo';
 
   static String get title => isProd ? appName : '$appName (Dev)';
 }

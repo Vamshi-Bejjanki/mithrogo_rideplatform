@@ -67,7 +67,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   return (
     <div className="shell">
       <aside className="sidebar">
-        <div className="brand"><span className="brand-mark">🛵</span> MithroGo</div>
+        <div className="brand"><span className="brand-mark">🛵</span> MithrGo</div>
         <nav className="nav">
           {NAV.map((group) => (
             <div key={group.group}>

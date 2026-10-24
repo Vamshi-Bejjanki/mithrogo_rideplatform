@@ -31,7 +31,7 @@ export default function LoginPage() {
     <div className="login-page">
       <form className="login-card" onSubmit={submit}>
         <div className="brand">
-          <span className="brand-mark">🛵</span> MithroGo Admin
+          <span className="brand-mark">🛵</span> MithrGo Admin
         </div>
         <h2>Sign in</h2>
         <p className="sub" style={{ marginTop: -6, marginBottom: 16 }}>

@@ -6,8 +6,8 @@ from core.metrics import dashboard_metrics
 
 
 class MithroAdminSite(AdminSite):
-    site_header = "MithroGo Admin"
-    site_title = "MithroGo Admin"
+    site_header = "MithrGo Admin"
+    site_title = "MithrGo Admin"
     index_title = "Operations dashboard"
     index_template = "core/admin/index.html"
 

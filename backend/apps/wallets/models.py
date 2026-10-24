@@ -4,7 +4,7 @@ from core.models import TimeStampedModel
 
 
 class CaptainWallet(TimeStampedModel):
-    """Prepaid balance a captain uses to pay Mithrogo: plans and platform dues. Customers pay captains in cash."""
+    """Prepaid balance a captain uses to pay Mithrgo: plans and platform dues. Customers pay captains in cash."""
 
     captain = models.OneToOneField("captains.CaptainProfile", on_delete=models.CASCADE, related_name="wallet")
     balance = models.DecimalField(max_digits=12, decimal_places=2, default=0)

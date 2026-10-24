@@ -44,7 +44,7 @@ def test_ticket_conversation(customer, admin_api):
 
     detail = api.get(f"/api/v1/support/tickets/{ticket['id']}/").json()
     assert detail["status"] == "IN_PROGRESS"
-    assert detail["messages"][0] == {**detail["messages"][0], "is_staff": True, "author_name": "MithroGo Support"}
+    assert detail["messages"][0] == {**detail["messages"][0], "is_staff": True, "author_name": "MithrGo Support"}
 
     admin_api.post(f"/api/v1/admin/tickets/{ticket['id']}/status/", {"status": "RESOLVED", "note": "Refunded"},
                    format="json")
