@@ -1,9 +1,10 @@
 # payments
 
-`Payment` model and payment-gateway abstraction.
+`Payment` model and payment-gateway abstraction (`providers.py`).
 
-- Types: `RIDE_PAYMENT`, `CAPTAIN_SUBSCRIPTION`
+- Types include `RIDE_PAYMENT`, `CAPTAIN_SUBSCRIPTION`, `WALLET_TOP_UP`, and payments for dues and cancellation fees
 - Statuses: CREATED, PENDING, SUCCESS, FAILED, REFUNDED
-- Provider interface with a mock implementation first, real gateway later
-- Webhook handling and reconciliation
-- Never trust "payment succeeded" from the mobile app; verify with the provider
+- Only a mock provider exists (`PAYMENT_PROVIDER`); a real gateway is a new provider class
+- The webhook (`payments/webhook/`) needs a valid HMAC `X-Payment-Signature`. `services.mark_success` is idempotent and checks the amount
+- Never trust "payment succeeded" from the app. `payments/{id}/` only reports status
+- Dev: `python manage.py simulate_payment <provider_order_id>` (debug only)

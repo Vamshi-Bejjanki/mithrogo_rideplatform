@@ -2,7 +2,6 @@
 
 Django project configuration.
 
-- Split settings (base / dev / prod), all secrets from environment variables
-- Root URL conf mounting `/api/v1/`
-- ASGI (Channels) and WSGI entrypoints
-- Celery app and Redis/Postgres configuration
+- `settings.py`: one settings module. Environment-specific values come from environment variables (see `../.env.example`): secret key, debug, hosts, PostgreSQL (SQLite when `POSTGRES_DB` is empty), JWT lifetimes, `SMS_PROVIDER` (console in debug, MSG91 otherwise), `PAYMENT_PROVIDER`, `PAYMENT_WEBHOOK_SECRET`, `PUSH_PROVIDER`.
+- `urls.py`: mounts Django admin at `/admin/` and the API at `/api/v1/`.
+- `asgi.py` / `wsgi.py`: entrypoints. Channels and Celery are not configured yet.

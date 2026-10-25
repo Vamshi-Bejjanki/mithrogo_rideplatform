@@ -1,7 +1,5 @@
 # docker
 
-Container configuration.
+Placeholder. There are no Dockerfiles or compose file yet. Local development runs the backend directly with SQLite or PostgreSQL (see `../backend/README.md`).
 
-- Backend Dockerfile
-- PostgreSQL and Redis for local development (wired via root `docker-compose.yml`)
-- Production images later
+Planned: backend Dockerfile, PostgreSQL (and Redis once live location moves off polling) for local development, production images.

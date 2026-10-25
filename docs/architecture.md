@@ -1,5 +1,7 @@
 # System Design — Ride Platform
 
+> **Implementation status.** This describes the target architecture. The running MVP is a single Django app on PostgreSQL (SQLite for quick runs) with REST polling for live updates. Channels/WebSockets, Redis (geo index, locks, Celery broker), Celery workers and a real payment gateway are not built; timed work runs from `python manage.py run_periodic_jobs`. See [PROJECT_DESIGN.md](PROJECT_DESIGN.md) for the full list of differences.
+
 Companion to [PROJECT_DESIGN.md](PROJECT_DESIGN.md). This document describes how the system is built and how it evolves, using the same building blocks as Uber, Rapido and Namma Yatri, sized for a single-city launch.
 
 Principle: **start as a modular monolith, split out only the parts that get hot** (location, notifications). Do not begin with microservices.
