@@ -1,5 +1,13 @@
 # Ride Platform MVP — Product & Technical Design
 
+> **Implementation status (read first).** This is the original MVP spec. The code follows its business rules, but differs in these ways:
+> - Live location and ride updates use REST polling (`captains/location/`, `captains/offers/`, `rides/{id}/tracking/`). WebSockets (section 14), Redis and Celery are not built; `python manage.py run_periodic_jobs` does the timed work.
+> - Payments use a mock gateway behind a provider interface. SMS OTP goes through MSG91; push goes through a pluggable provider (logs only by default).
+> - Plans are per vehicle: `DAILY_BIKE` (₹30) and `DAILY_AUTO` (₹50) for a 12-hour session, `RIDE_SHARE_BIKE` and `RIDE_SHARE_AUTO`. Captains pick a vehicle of the day.
+> - Added beyond this spec: captain wallet, promo codes and referrals, saved places, ride sharing by link, ride start PIN, cancellation and no-show fees, SOS, account deletion, and the `admin_web` console (API under `admin/`).
+> - Apps: `customer_app` is built; `captain_app` is not started. Admin is Django Admin plus `admin_web`.
+> - Current API reference: [api.md](api.md).
+
 ## 1. Project Overview
 
 Build a single-city ride-hailing platform for Android and iOS with two mobile applications:

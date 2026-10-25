@@ -2,7 +2,7 @@
 
 Django 5.2 / Django REST Framework modular monolith for the ride platform MVP. Spec: [docs/PROJECT_DESIGN.md](../docs/PROJECT_DESIGN.md).
 
-Admin is Django Admin, customised in `core/` (dashboard, live map, reports, announcements, audit log, KYC, dues, ticket and SOS actions). The API lives under `/api/v1/`; the admin web app (`../admin_web`) uses its `admin/` endpoints.
+Django Admin is customised in `core/` (dashboard, live map, reports, announcements, audit log, KYC, dues, ticket and SOS actions). The API lives under `/api/v1/`; the admin web app (`../admin_web`) uses its `admin/` endpoints.
 
 ## Setup (development)
 
@@ -83,14 +83,14 @@ Nothing here is hard-coded in views. Changing a value in admin takes effect on t
 
 Full reference with request bodies, status codes, and a test sequence: [docs/api.md](../docs/api.md).
 
-
 | Area | Endpoints |
 |---|---|
 | Health | `GET health/` |
 | Auth | `POST auth/send-otp/`, `POST auth/verify-otp/`, `POST auth/refresh/`, `POST auth/logout/`, `GET auth/me/` |
 | Customer | `GET/PATCH customers/profile/`, `customers/places/`, `customers/promos/`, `customers/referral/`, `POST customers/referral/apply/`, `GET/POST auth/delete-account/` |
-| Captain | `GET/PATCH captains/profile/`, `GET captains/status/`, `POST captains/status/online/`, `POST captains/status/offline/`, `POST captains/kyc/`, `POST/GET captains/kyc/documents/`, `POST captains/location/`, `GET captains/earnings/` |
+| Captain | `GET/PATCH captains/profile/`, `GET captains/status/`, `POST captains/status/online/`, `POST captains/status/offline/`, `POST captains/kyc/`, `POST/GET captains/kyc/documents/`, `POST captains/location/`, `GET/POST captains/vehicle-of-day/`, `GET captains/earnings/` |
 | Vehicles | `GET/POST captains/vehicles/` |
+| Wallet | `GET captains/wallet/`, `POST captains/wallet/top-up/`, `POST captains/wallet/pay-plan/`, `POST captains/wallet/pay-dues/` |
 | Subscriptions | `GET captains/subscription/`, `GET captains/subscription/plans/`, `POST captains/subscription/create-payment/`, `POST captains/subscription/verify-payment/`, `POST captains/subscription/plan/`, `GET captains/subscription/history/`, `GET captains/subscription/dues/`, `POST captains/subscription/dues/pay/` |
 | Rides (customer) | `POST rides/estimate/`, `GET/POST rides/`, `GET rides/{id}/`, `GET/POST rides/{id}/cancel/`, `GET rides/{id}/tracking/`, `POST rides/{id}/payment/`, `POST rides/{id}/fee-payment/`, `GET rides/outstanding-fees/`, `POST/DELETE rides/{id}/share/`, `POST rides/{id}/rating/`, public `GET share/{token}/` |
 | Rides (captain) | `GET captains/offers/`, `GET captains/rides/`, `GET captains/rides/{id}/`, `POST captains/rides/{id}/accept|reject|arrived|start|complete|cancel|surrender|collect-cash/` |
@@ -103,7 +103,7 @@ Money is returned as strings. Errors look like `{"detail": "...", "code": "..."}
 
 ## Not in this MVP (deliberately)
 
-- WebSockets and Redis live location (captains are polled via `captains/location/`; the customer polls `rides/{id}/tracking/`).
+- WebSockets and Redis live location (captains send their position to `captains/location/` and poll `captains/offers/`; the customer polls `rides/{id}/tracking/`).
 - Celery and a real payment gateway (mock payments). Push goes through `PUSH_PROVIDER` (default logs only); a Firebase (FCM) provider needs the service-account credentials.
 - Final fare is the fare locked at request time. Distance-based final pricing waits for route tracking.
 - Refunds. Cancellation fees, captain cancellations and promos are in; refunds wait for the real gateway.

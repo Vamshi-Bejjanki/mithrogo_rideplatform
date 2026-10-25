@@ -2,11 +2,11 @@
 
 Core ride engine.
 
-- Models: `Ride`, `RideLocation`, `Rating`
-- Statuses: REQUESTED → SEARCHING → ACCEPTED → CAPTAIN_ARRIVED → STARTED → COMPLETED (+ CANCELLED)
-- Services: `FareService`, matching service, ride state machine (every transition validated server-side)
-- `Ride.vehicle_type` (BIKE/AUTO) chosen by the customer; fares are configured per vehicle type
-- Matching: nearest eligible captain with the same vehicle type within configurable radius (default 3 km), handle reject/timeout, prevent double-accept with locking
-- WebSocket consumer: `/ws/ride/{ride_id}/`
-- Live location in Redis; only needed history in PostgreSQL
-- APIs: estimate, create, list/detail, cancel, tracking, rating; captain accept/reject/arrived/start/complete
+- Models: `Ride`, `RideLocation` (recorded route), `Rating`, offers, `FareConfig`
+- Statuses: REQUESTED → SEARCHING → ACCEPTED → CAPTAIN_ARRIVED → STARTED → COMPLETED (+ CANCELLED). Transitions are validated in `state.py`
+- `vehicle_type` (BIKE/AUTO) is chosen by the customer; fares are per vehicle type (`pricing.py`, `FareConfig` in admin). The fare is locked when the ride is created
+- Matching (`matching.py`): nearest eligible online captain with the same vehicle type inside the configured radius, one offer at a time, with timeout, reject, and row locks against double-accept
+- Ride start PIN, cancellation and no-show fees, ride sharing by link (`share/{token}/`), idempotent create via `Idempotency-Key`
+- Customer APIs: estimate, create, list/detail, cancel, tracking, payment, fee payment, outstanding fees, share, rating
+- Captain APIs (`captain_urls.py`): offers, rides, accept/reject/arrived/start/complete/cancel/surrender/collect-cash
+- Live updates are polled (`tracking/`, `offers/`); there are no WebSockets yet

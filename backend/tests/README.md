@@ -1,7 +1,11 @@
 # tests
 
-Cross-app and integration tests (per-app unit tests live inside each app).
+pytest-django suite covering the API end to end. Run from `backend/`:
 
-Cover: authentication, role permissions, fare calculation, subscription expiry, ride transitions, captain eligibility, matching/concurrency, payment verification, object-level permissions.
+```bash
+python -m pytest
+```
 
-Runner: pytest (pytest-django).
+Files cover auth and OTP, role and object permissions, fare calculation, ride lifecycle, safety and cancellation, ride-share counting, matching, captain onboarding and API, wallet, payments and webhooks, customer extras (places, promos, referrals), support and back-office, admin pages, and periodic jobs. Shared fixtures are in `conftest.py` and `helpers.py`.
+
+Tests run on SQLite, so row-lock behaviour is only exercised for real on PostgreSQL.

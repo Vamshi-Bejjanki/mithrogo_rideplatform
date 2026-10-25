@@ -12,9 +12,10 @@ Captain plans: a 12-hour daily session (Bike ₹30, Auto ₹50), or ride-share (
 - Ride-share: only 1 ride's fare per day goes to the platform, from the captain's first 5 completed rides. Captain may surrender one of the first 4; otherwise the 5th is taken automatically. All other rides that day are free (even 100 rides)
 - Counting runs inside ride completion with a row lock on the day's `RideShareDay`
 - Shortfall day (1 to 4 rides, none surrendered): next day the captain owes a ₹30 `SHORTFALL_FEE` (blocks going online until paid) and the first ride of that day is taken as a penalty ride. Zero-ride days are exempt
-- End-of-day Celery job closes days and applies shortfall penalties
+- The periodic job closes ride-share days and applies shortfall penalties
 - Cash platform rides create a `PlatformDue`; dues over the limit block going online
 - Eligibility check used by go-online and ride accept
-- Celery task to expire subscriptions
+- Expiry and day-closing run in `python manage.py run_periodic_jobs` (no Celery yet)
 - Expiry never cancels a ride already in progress
-- APIs: `/captains/subscription/`, `create-payment/`, `verify-payment/`, plan switch, `/captains/rides/{id}/surrender/`, dues
+- Plan codes: `DAILY_BIKE`, `DAILY_AUTO`, `RIDE_SHARE_BIKE`, `RIDE_SHARE_AUTO`
+- APIs: `captains/subscription/` (+ `plans/`, `create-payment/`, `verify-payment/`, `plan/`, `history/`, `dues/`, `dues/pay/`), `captains/rides/{id}/surrender/`. Paying from the wallet is in `wallets/`

@@ -6,3 +6,4 @@ Captain wallet: a prepaid balance captains use to pay Mithrgo for plans and plat
 - Money in: top-up through the payment gateway (`PaymentType.WALLET_TOP_UP`). Credited only when the webhook confirms the payment
 - Money out: `pay-plan/` (daily plan, activates at once) and `pay-dues/` (all pending dues, settled in one step). Both fail rather than going negative
 - No withdrawals in this version
+- APIs: `captains/wallet/` (balance and ledger), `top-up/`, `pay-plan/`, `pay-dues/`

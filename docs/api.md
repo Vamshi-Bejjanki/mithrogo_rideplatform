@@ -20,6 +20,7 @@ Base URL: `/api/v1/` (for example `http://127.0.0.1:8000/api/v1/` in development
 | POST | `auth/verify-otp/` | none | `{"phone": "...", "code": "123456", "role": "CUSTOMER"}`, or `"CAPTAIN"`. Returns `user`, `access`, `refresh`. Codes expire after 5 minutes, work once, and lock after 5 wrong tries. |
 | POST | `auth/refresh/` | none | `{"refresh": "..."}`. Returns new tokens and rotates the refresh token. |
 | POST | `auth/logout/` | bearer | `{"refresh": "..."}`. Blacklists the refresh token. Returns `204`. |
+| POST | `auth/admin/login/` | none | Phone and password, ADMIN accounts only. Used by `admin_web`. |
 | GET | `auth/me/` | bearer | Current user. |
 
 A phone number belongs to one role. A captain's number can't sign in with `"role": "CUSTOMER"`, and the reverse.
@@ -29,6 +30,12 @@ A phone number belongs to one role. A captain's number can't sign in with `"role
 | Method | Path | Body / notes |
 |---|---|---|
 | GET, PATCH | `customers/profile/` | PATCH fields: `first_name`, `last_name`, `email`, `emergency_contact_name`, `emergency_contact_phone`. |
+| GET, POST | `customers/places/` | Saved places (home, work, other). |
+| GET, PATCH, DELETE | `customers/places/{id}/` | One saved place. |
+| GET | `customers/promos/` | Promo codes the customer can use. |
+| GET | `customers/referral/` | The customer's referral code and rewards. |
+| POST | `customers/referral/apply/` | Apply someone else's referral code. |
+| GET, POST | `auth/delete-account/` | Account deletion. The account is anonymised and records are kept. |
 
 ## Rides (customer)
 
@@ -38,9 +45,12 @@ A phone number belongs to one role. A captain's number can't sign in with `"role
 | GET | `rides/` | The 50 most recent rides. |
 | POST | `rides/` | Estimate fields plus `pickup_address`, `drop_address`, `payment_method` (`ONLINE` or `CASH`, default `ONLINE`). Optional `Idempotency-Key` header. Starts matching immediately. |
 | GET | `rides/{id}/` | Ride details. Also moves a stalled search forward. |
-| POST | `rides/{id}/cancel/` | Allowed until the ride starts. |
+| GET, POST | `rides/{id}/cancel/` | Allowed until the ride starts. GET previews any cancellation fee; POST cancels. Fees default to ₹0. |
 | GET | `rides/{id}/tracking/` | Ride status, pickup and drop, and the captain's latest location and vehicle once a captain has accepted. |
 | POST | `rides/{id}/payment/` | Creates an online payment for a completed `ONLINE` ride. Returns a payment with `provider_order_id`. |
+| POST | `rides/{id}/fee-payment/` | Pays a cancellation or no-show fee online. |
+| GET | `rides/outstanding-fees/` | Unpaid fees that block a new booking when that setting is on. |
+| POST, DELETE | `rides/{id}/share/` | Create or revoke a live-trip link. Anyone with the link can open public `GET share/{token}/`. |
 | POST | `rides/{id}/rating/` | `{"rating": 1-5, "comment": "..."}`. Only for completed rides, once per ride. |
 
 A customer can have only one active ride at a time. The fare is fixed when the ride is created. The client cannot change it.
@@ -58,6 +68,7 @@ A customer can have only one active ride at a time. The fare is fixed when the r
 | POST | `captains/kyc/documents/` | Multipart form: `doc_type` (`DRIVING_LICENSE`, `VEHICLE_REGISTRATION`, `IDENTITY`, `PHOTO`, `OTHER`) and `file`. |
 | GET | `captains/kyc/documents/` | Documents uploaded so far. |
 | GET, POST | `captains/vehicles/` | POST: `{"vehicle_type": "BIKE"\|"AUTO", "registration_number", "make"?, "model"?, "color"?}`. One vehicle per type. New vehicles are unverified until an admin verifies them. |
+| GET, POST | `captains/vehicle-of-day/` | The captain picks which vehicle they drive today. Going online and the active plan must match it. |
 | GET | `captains/earnings/` | `completed_rides`, `fare_total`, `platform_share`, `net_earnings`, today's totals, and `pending_dues`. |
 
 ## Ride requests and rides (captain)
@@ -70,6 +81,7 @@ A customer can have only one active ride at a time. The fare is fixed when the r
 | POST | `captains/rides/{id}/arrived/` | `ACCEPTED` → `CAPTAIN_ARRIVED`. |
 | POST | `captains/rides/{id}/start/` | `CAPTAIN_ARRIVED` → `STARTED`. |
 | POST | `captains/rides/{id}/complete/` | `STARTED` → `COMPLETED`. Updates earnings and the ride-share count. |
+| POST | `captains/rides/{id}/cancel/` | Captain cancels before the ride starts; the ride is offered to the next captain. |
 | POST | `captains/rides/{id}/surrender/` | Ride-share plan only. Marks this ride as the platform ride, if it's one of the first four rides today. Once per day. |
 | POST | `captains/rides/{id}/collect-cash/` | For completed `CASH` rides. Records the cash as collected. |
 | GET | `captains/rides/` | Optional `?status=COMPLETED`. The 50 most recent rides. |
@@ -83,12 +95,23 @@ Ride status flow: `REQUESTED` → `SEARCHING` → `ACCEPTED` → `CAPTAIN_ARRIVE
 |---|---|---|
 | GET | `captains/subscription/` | Current plan, `eligible`, `reasons`, `pending_dues`, and today's ride-share progress. |
 | GET | `captains/subscription/plans/` | Active plans with their current prices. |
-| POST | `captains/subscription/create-payment/` | `{"plan_code": "DAILY_30"}`. Creates a payment. The plan activates only after the gateway confirms it. |
+| POST | `captains/subscription/create-payment/` | `{"plan_code": "DAILY_BIKE"}` or `"DAILY_AUTO"`. Creates a payment for a 12-hour session. The plan activates only after the gateway confirms it. Needs a verified vehicle of that type. |
 | POST | `captains/subscription/verify-payment/` | `{"payment_id": "..."}`. Reports status only. It never activates a plan. |
-| POST | `captains/subscription/plan/` | `{"plan_code": "RIDE_SHARE_1_IN_5"}`. Switches to the ride-share plan immediately. Refused while on a ride. |
+| POST | `captains/subscription/plan/` | `{"plan_code": "RIDE_SHARE_BIKE"}` or `"RIDE_SHARE_AUTO"`. Switches to the ride-share plan immediately. Refused while on a ride. |
 | GET | `captains/subscription/history/` | Past and current plans. |
 | GET | `captains/subscription/dues/` | Platform dues: amounts, types, and status. |
 | POST | `captains/subscription/dues/pay/` | Creates one payment covering all pending dues. |
+
+## Captain wallet
+
+A prepaid balance for paying plans and dues. Customers pay captains directly, so there is no customer wallet.
+
+| Method | Path | Body / notes |
+|---|---|---|
+| GET | `captains/wallet/` | Balance and ledger. |
+| POST | `captains/wallet/top-up/` | Creates a payment; the balance is credited only when the webhook confirms it. |
+| POST | `captains/wallet/pay-plan/` | Buys a daily plan from the balance; activates at once. |
+| POST | `captains/wallet/pay-dues/` | Settles all pending dues from the balance. Fails rather than going negative. |
 
 ## Payments, notifications, support
 
@@ -98,7 +121,16 @@ Ride status flow: `REQUESTED` → `SEARCHING` → `ACCEPTED` → `CAPTAIN_ARRIVE
 | POST | `payments/webhook/` | Gateway only. Requires a valid `X-Payment-Signature`. Apps must not call this. |
 | GET | `notifications/` | The 100 most recent notifications. |
 | POST | `notifications/{id}/read/` | Marks one as read. |
+| POST | `notifications/read-all/` | Marks all as read. |
+| POST, DELETE | `notifications/devices/` | Register or remove a push token. |
 | GET, POST | `support/tickets/` | POST: `{"category": "RIDE_ISSUE"\|"PAYMENT"\|"SAFETY"\|"ACCOUNT"\|"OTHER", "description", "ride_id"?}`. `ride_id` must be a ride the user took part in. |
+| GET | `support/tickets/{id}/` | One ticket with its messages. |
+| GET, POST | `support/tickets/{id}/messages/` | The conversation with support. |
+| GET, POST | `support/sos/` | Raise or list emergency alerts. Every admin is notified and a SAFETY ticket opens. |
+
+## Admin API
+
+Used by `admin_web`. ADMIN tokens only; every change is audit-logged. Paths are under `admin/`: `dashboard/`, `reports/daily/`, `reports/captain-earnings/`, `customers/` (+ suspend, reactivate), `captains/` (+ approve, reject, suspend, reactivate), `vehicles/{id}/verify|unverify/`, `rides/` (+ `live/`, `{id}/route/`, cancel, waive-fee), `payments/`, `subscriptions/`, `dues/` (+ settle, waive), `tickets/` (+ reply, status), `sos/` (+ acknowledge, resolve), `promos/`, `fares/`, `plans/`, `config/`, `audit-log/`, `broadcast/`. The full list is in `backend/apps/backoffice/urls.py`.
 
 ## Development-only helpers
 

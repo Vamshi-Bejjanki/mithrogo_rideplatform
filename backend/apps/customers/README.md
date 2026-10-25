@@ -1,6 +1,6 @@
 # customers
 
-`CustomerProfile` (photo, emergency contact name/phone).
+`CustomerProfile` (photo, emergency contact, referral code) and saved places (home, work, other).
 
-- APIs: `GET/PATCH /customers/profile/`
-- Customer-side ride actions live in `rides/`
+- APIs: `GET/PATCH customers/profile/`, `customers/places/` (+ `{id}/`), `customers/promos/`, `customers/referral/`, `POST customers/referral/apply/`
+- Promo and referral logic is in `promotions/`; ride actions are in `rides/`
