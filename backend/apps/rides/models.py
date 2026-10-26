@@ -1,6 +1,7 @@
 import uuid
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Q
@@ -94,10 +95,29 @@ class FareConfig(TimeStampedModel):
     base_fare = models.DecimalField(max_digits=8, decimal_places=2)
     per_km = models.DecimalField(max_digits=8, decimal_places=2)
     minimum_fare = models.DecimalField(max_digits=8, decimal_places=2)
+    long_distance_after_km = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Distance beyond this many km is charged at the long-distance rate. Empty = no tiering.",
+    )
+    long_distance_per_km = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Per-km rate for the distance beyond the threshold.",
+    )
     platform_customer_fee = models.DecimalField(
         max_digits=8, decimal_places=2, default=0, help_text="Added to every customer fare."
     )
     is_active = models.BooleanField(default=True)
+
+    def clean(self):
+        super().clean()
+        if (self.long_distance_after_km is None) != (self.long_distance_per_km is None):
+            raise ValidationError("Set both the long-distance threshold and rate, or neither.")
 
     def __str__(self):
         return f"Fare {self.get_vehicle_type_display()}"

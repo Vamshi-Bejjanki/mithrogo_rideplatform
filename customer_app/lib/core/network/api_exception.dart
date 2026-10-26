@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 /// A failed API call, with the backend's message converted for display.
 ///
@@ -28,6 +29,7 @@ class ApiException implements Exception {
   factory ApiException.fromDio(DioException error) {
     final response = error.response;
     if (response == null) {
+      debugPrint('API unreachable: ${error.type} ${error.requestOptions.uri} ${error.error}');
       return const ApiException(
         message: 'Cannot reach the server. Check your connection and try again.',
       );

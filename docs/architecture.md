@@ -140,7 +140,7 @@ REQUESTED → SEARCHING → ACCEPTED → CAPTAIN_ARRIVED → STARTED → COMPLET
 - Every transition appended to a `RideEvent` log (who, from, to, when) for support/disputes
 
 ### 3.5 Fare service
-- Inputs: distance and duration from the maps provider, plus config rows (`base_fare`, `per_km`, `minimum_fare`, `platform_customer_fee`)
+- Inputs: distance and duration from the maps provider, plus config rows (`base_fare`, `per_km`, optional `long_distance_after_km` / `long_distance_per_km` tier, `minimum_fare`, `platform_customer_fee`)
 - `estimated_fare` computed at request time and stored; `final_fare` computed server-side at completion from actual distance/time
 - Client never sends a fare. Config is versioned so old rides keep the rates they were priced with.
 

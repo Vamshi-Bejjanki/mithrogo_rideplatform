@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -109,34 +110,87 @@ class _BookingSheetState extends ConsumerState<BookingSheet> {
             const SizedBox(height: 8),
           ],
           const SizedBox(height: 4),
-          SegmentedButton<PaymentMethod>(
-            segments: const [
-              ButtonSegment(
-                value: PaymentMethod.cash,
-                icon: Icon(Icons.payments_outlined),
-                label: Text('Cash'),
-              ),
-              ButtonSegment(
-                value: PaymentMethod.online,
-                icon: Icon(Icons.qr_code_2),
-                label: Text('UPI / Card'),
-              ),
+          Text('Add a tip for your captain', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          _TipSelector(tip: booking.tip, onChanged: notifier.setTip),
+          const SizedBox(height: 12),
+          // Cash only for now; UPI / card will come later.
+          Row(
+            children: [
+              const Icon(Icons.payments_outlined, size: 20),
+              const SizedBox(width: 8),
+              Text('Pay with cash', style: theme.textTheme.bodyMedium),
             ],
-            selected: {booking.payment},
-            showSelectedIcon: false,
-            onSelectionChanged: (selection) => notifier.selectPayment(selection.first),
           ),
           const SizedBox(height: 16),
           AppButton(
             variant: AppButtonVariant.brand,
             label: selected == null
                 ? 'Book ${booking.vehicle.label}'
-                : 'Book ${booking.vehicle.label} · ${formatInr(selected.fare)}',
+                : 'Book ${booking.vehicle.label} · ${formatRupees((roundToRupees(selected.fare) + BigInt.from(booking.tip)).toInt())}',
             loading: _booking,
             onPressed: booking.canBook && !_booking ? _book : null,
           ),
         ],
       ),
+    );
+  }
+}
+
+class _TipSelector extends StatelessWidget {
+  const _TipSelector({required this.tip, required this.onChanged});
+
+  static const _presets = [20, 30, 50];
+
+  final int tip;
+  final ValueChanged<int> onChanged;
+
+  bool get _isCustom => tip > 0 && !_presets.contains(tip);
+
+  Future<void> _askCustom(BuildContext context) async {
+    final controller = TextEditingController(text: _isCustom ? '$tip' : '');
+    final value = await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Custom tip'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(4)],
+          decoration: const InputDecoration(prefixText: '₹ ', hintText: 'Amount'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, int.tryParse(controller.text) ?? 0),
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (value != null) onChanged(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      children: [
+        for (final amount in _presets)
+          ChoiceChip(
+            label: Text('₹$amount'),
+            selected: tip == amount,
+            // Tapping the selected amount again removes the tip.
+            onSelected: (selected) => onChanged(selected ? amount : 0),
+          ),
+        ChoiceChip(
+          label: Text(_isCustom ? '₹$tip' : 'Custom'),
+          selected: _isCustom,
+          onSelected: (_) => _askCustom(context),
+        ),
+      ],
     );
   }
 }
