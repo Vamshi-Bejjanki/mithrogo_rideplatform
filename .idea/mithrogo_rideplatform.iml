@@ -7,6 +7,7 @@
       <excludeFolder url="file://$MODULE_DIR$/customer_app/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/customer_app/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/customer_app/build" />
+<<<<<<< HEAD
       <excludeFolder url="file://$MODULE_DIR$/customer_app/windows/flutter/ephemeral/.plugin_symlinks/flutter_secure_storage_windows/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/customer_app/windows/flutter/ephemeral/.plugin_symlinks/flutter_secure_storage_windows/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/customer_app/windows/flutter/ephemeral/.plugin_symlinks/flutter_secure_storage_windows/build" />
@@ -31,6 +32,8 @@
       <excludeFolder url="file://$MODULE_DIR$/customer_app/windows/flutter/ephemeral/.plugin_symlinks/url_launcher_windows/example/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/customer_app/windows/flutter/ephemeral/.plugin_symlinks/url_launcher_windows/example/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/customer_app/windows/flutter/ephemeral/.plugin_symlinks/url_launcher_windows/example/build" />
+=======
+>>>>>>> 48153eee9d93a54531f6f58240ac8143c83fbf9a
     </content>
     <orderEntry type="jdk" jdkName="D:\projects\mithrogo_rideplatform\.venv" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
