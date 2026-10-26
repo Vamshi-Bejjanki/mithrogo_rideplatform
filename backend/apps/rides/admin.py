@@ -161,7 +161,8 @@ m.fitBounds([d.pickup,d.drop].concat(d.trail),{{padding:[30,30]}});}})();</scrip
 
 @admin.register(FareConfig)
 class FareConfigAdmin(AuditedModelAdmin):
-    list_display = ("vehicle_type", "base_fare", "per_km", "minimum_fare", "platform_customer_fee", "is_active")
+    list_display = ("vehicle_type", "base_fare", "per_km", "minimum_fare", "long_distance_after_km",
+                    "long_distance_per_km", "platform_customer_fee", "is_active")
     list_filter = ("is_active",)
 
 

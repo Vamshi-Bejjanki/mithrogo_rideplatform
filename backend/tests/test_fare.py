@@ -8,7 +8,7 @@ from apps.users.models import Role
 from core.exceptions import DomainError
 from tests.helpers import DROP, PICKUP, make_user, ride_payload
 
-# About 0.45 km north of pickup: road estimate ~0.59 km, below the bike minimum fare.
+# About 0.45 km north of pickup: road estimate ~0.59 km, well under the 2 km flat-fare range.
 SHORT_DROP = (Decimal("18.676550"), Decimal("78.094000"))
 # About 0.2 km north: below the minimum trip length.
 TOO_SHORT_DROP = (Decimal("18.674300"), Decimal("78.094000"))
@@ -19,25 +19,28 @@ def quote(vehicle_type="BIKE", drop=DROP):
 
 
 @pytest.mark.django_db
-def test_bike_fare_is_base_plus_per_km_on_road_distance():
+def test_fare_is_eight_per_km_with_no_base_fare():
     result = quote()
 
-    expected = max(Decimal("25.00"), Decimal("20.00") + Decimal("8.00") * result.distance_km)
+    assert result.distance_km > 2.5
+    assert result.fare == (Decimal("8.00") * result.distance_km).quantize(Decimal("0.01"))
+
+
+@pytest.mark.django_db
+def test_km_beyond_threshold_use_the_lower_rate():
+    FareConfig.objects.filter(vehicle_type="BIKE").update(
+        long_distance_after_km=Decimal("2.00"), long_distance_per_km=Decimal("4.00")
+    )
+    result = quote()
+
+    expected = Decimal("8.00") * 2 + Decimal("4.00") * (result.distance_km - 2)
     assert result.fare == expected.quantize(Decimal("0.01"))
 
 
 @pytest.mark.django_db
-def test_minimum_fare_applies_to_short_trips():
-    result = quote(drop=SHORT_DROP)
-
-    assert result.fare == Decimal("25.00")
-
-
-@pytest.mark.django_db
-def test_auto_uses_its_own_rates_and_minimum():
-    result = quote("AUTO", drop=SHORT_DROP)
-
-    assert result.fare == Decimal("40.00")
+def test_fares_below_twenty_are_raised_to_the_twenty_minimum():
+    assert quote(drop=SHORT_DROP).fare == Decimal("20.00")
+    assert quote("AUTO", drop=SHORT_DROP).fare == Decimal("20.00")
 
 
 @pytest.mark.django_db

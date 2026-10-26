@@ -251,7 +251,8 @@ class PromoCodeSerializer(serializers.ModelSerializer):
 class FareConfigSerializer(serializers.ModelSerializer):
     class Meta:
         model = FareConfig
-        fields = ["id", "vehicle_type", "base_fare", "per_km", "minimum_fare", "platform_customer_fee", "is_active",
+        fields = ["id", "vehicle_type", "base_fare", "per_km", "minimum_fare", "long_distance_after_km",
+                  "long_distance_per_km", "platform_customer_fee", "is_active",
                   "updated_at"]
         read_only_fields = ["id", "vehicle_type", "updated_at"]
 

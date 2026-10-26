@@ -32,6 +32,7 @@ class RideRepository {
     required VehicleType vehicleType,
     required PaymentMethod paymentMethod,
     required String idempotencyKey,
+    int tip = 0,
   }) async {
     final response = await _api.send((dio) => dio.post<Map<String, dynamic>>(
           ApiEndpoints.rides,
@@ -41,6 +42,7 @@ class RideRepository {
             'pickup_address': pickup.address,
             'drop_address': drop.address,
             'payment_method': paymentMethod.apiValue,
+            if (tip > 0) 'tip': tip,
           },
           options: Options(headers: {'Idempotency-Key': idempotencyKey}),
         ));

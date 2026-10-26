@@ -2,4 +2,5 @@
 <resources>
     <!-- Same as AppColors.brand in lib/app/theme/app_colors.dart. -->
     <color name="splash_background">#FFFFC629</color>
+    <color name="ic_launcher_background">#FF111111</color>
 </resources>

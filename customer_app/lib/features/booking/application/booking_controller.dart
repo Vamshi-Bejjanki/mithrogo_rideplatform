@@ -16,6 +16,7 @@ class BookingState {
     this.estimates = const {},
     this.estimating = false,
     this.error,
+    this.tip = 0,
   });
 
   /// Null means "current location", resolved when needed.
@@ -26,6 +27,9 @@ class BookingState {
   final Map<VehicleType, FareEstimate> estimates;
   final bool estimating;
   final String? error;
+
+  /// Optional tip in whole rupees, 0 for none.
+  final int tip;
 
   FareEstimate? get selectedEstimate => estimates[vehicle];
 
@@ -39,6 +43,7 @@ class BookingState {
     Map<VehicleType, FareEstimate>? estimates,
     bool? estimating,
     String? error,
+    int? tip,
     bool clearError = false,
   }) {
     return BookingState(
@@ -49,6 +54,7 @@ class BookingState {
       estimates: estimates ?? this.estimates,
       estimating: estimating ?? this.estimating,
       error: clearError ? null : (error ?? this.error),
+      tip: tip ?? this.tip,
     );
   }
 }
@@ -90,6 +96,10 @@ class BookingController extends Notifier<BookingState> {
     state = state.copyWith(payment: payment);
   }
 
+  void setTip(int tip) {
+    state = state.copyWith(tip: tip < 0 ? 0 : tip);
+  }
+
   void clearDrop() {
     _estimateRequest++;
     state = BookingState(
@@ -111,6 +121,7 @@ class BookingController extends Notifier<BookingState> {
           drop: drop,
           vehicleType: state.vehicle,
           paymentMethod: state.payment,
+          tip: state.tip,
           idempotencyKey: DateTime.now().microsecondsSinceEpoch.toString(),
         );
     clearDrop();
